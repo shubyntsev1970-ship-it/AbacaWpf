@@ -215,7 +215,7 @@ public partial class MainWindow : Window
                 Height = DiceSize,
                 Margin = new Thickness(DiceHorizontalGap / 2, _fixedDice[index] ? 0 : DiceSize, DiceHorizontalGap / 2, _fixedDice[index] ? DiceSize : 0),
                 CornerRadius = new CornerRadius(8),
-                BorderThickness = new Thickness(_fixedDice[index] ? _selectedDice[index] ? 6 : 1.25 : _selectedDice[index] ? 9 : 2),
+                BorderThickness = new Thickness(_fixedDice[index] ? _selectedDice[index] ? 6 : 0.625 : _selectedDice[index] ? 9 : 2),
                 BorderBrush = _fixedDice[index]
                     ? new SolidColorBrush(Color.FromRgb(239, 68, 68))
                     : _selectedDice[index]
@@ -762,7 +762,7 @@ public partial class MainWindow : Window
             "Ход: у игрока до трех бросков. Нажмите СТАРТ/СТОП или Space. После остановки можно кликом фиксировать нужные кубики; зафиксированные кубики не перебрасываются.\n\n" +
             "Школа 1-6: считается количество выбранного номинала. Три одинаковых дают 0; меньше трех записывает минус, больше трех - плюс. Отрицательная школа влияет на общий счет по старым правилам Abaca.\n\n" +
             "Комбинации: пара, две пары, тройка, фул, малая строка 1-2-3-4-5, большая строка 2-3-4-5-6, каре, абак и сумма. Комбинация, собранная с первого броска, удваивается.\n\n" +
-            "Призы: заполненная строка дает приз. В школе приз равен номиналу строки x 5, в остальных строках - максимуму строки. Заполненная колонка дает максимум колонки. Приз соперника в той же строке или колонке вычеркивается.\n\n" +
+            "Призы: заполненная строка дает приз. В школе приз равен номиналу строки x 5, в остальных строках - максимуму строки. Заполненная колонка дает максимум колонки. Приз соперника в той же строке или колонке вычеркивается (за исключением последней колонки).\n\n" +
             "Горячие клавиши:\n" +
             "  Space        - старт / стоп броска\n" +
             "  Left / Right - выбрать кубик слева / справа\n" +
