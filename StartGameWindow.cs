@@ -9,6 +9,7 @@ namespace AbacaWpf;
 
 public sealed class StartGameWindow : Window
 {
+    // Состояние стартовых бросков: пять маленьких кубиков и суммы двух игроков.
     private readonly Random _random;
     private readonly DispatcherTimer _rollTimer;
     private readonly int[] _rollingDice = new int[5];
@@ -65,6 +66,7 @@ public sealed class StartGameWindow : Window
     private bool _mustReroll;
     private bool _computerStartRollInProgress;
 
+    // Окно собирается кодом, потому что элементы меняют состояние во время стартовых бросков.
     public StartGameWindow(Random random)
     {
         _random = random;
@@ -95,6 +97,7 @@ public sealed class StartGameWindow : Window
         ResetStartRolls();
     }
 
+    // Эти свойства читает MainWindow после закрытия стартового окна.
     public string FirstPlayerName => _firstNameBox.Text.Trim();
     public string SecondPlayerName => PlayAgainstComputer ? "Компьютер" : _secondNameBox.Text.Trim();
     public bool SecondPlayerStarts => _secondRoll > _firstRoll;
@@ -106,6 +109,7 @@ public sealed class StartGameWindow : Window
         _ => ComputerDifficulty.Normal
     };
 
+    // Строит форму выбора игроков, сложности компьютера и видимых стартовых бросков.
     private Grid BuildContent()
     {
         var root = new Grid { Margin = new Thickness(26) };
@@ -256,6 +260,7 @@ public sealed class StartGameWindow : Window
         return diceStrip;
     }
 
+    // Возвращает стартовые броски в исходное состояние 0:0 и снова разрешает ввод имен.
     private void ResetStartRolls()
     {
         _rollTimer.Stop();
@@ -277,6 +282,7 @@ public sealed class StartGameWindow : Window
         UpdateRollButtonText();
     }
 
+    // Запускает или останавливает видимый бросок текущего стартового игрока.
     private void ToggleVisibleRoll()
     {
         if (_computerStartRollInProgress)
@@ -316,6 +322,7 @@ public sealed class StartGameWindow : Window
         _rollTimer.Start();
     }
 
+    // Фиксирует сумму остановленного стартового броска и передает ход второму игроку.
     private void StopVisibleRoll()
     {
         _rollTimer.Stop();
@@ -344,6 +351,7 @@ public sealed class StartGameWindow : Window
         EvaluateStartRolls();
     }
 
+    // После двух стартовых бросков решает: можно начинать игру или нужен переброс при равенстве.
     private void EvaluateStartRolls()
     {
         if (_firstRoll == _secondRoll)
@@ -367,6 +375,7 @@ public sealed class StartGameWindow : Window
         _rollStatusText.Text = $"Броски: {_firstRoll} : {_secondRoll}. Первым ходит: {starterName}.";
     }
 
+    // В режиме против компьютера второй стартовый бросок выполняется автоматически с небольшой паузой.
     private async void BeginComputerStartRoll()
     {
         _computerStartRollInProgress = true;
@@ -392,6 +401,7 @@ public sealed class StartGameWindow : Window
         UpdateRollButtonText();
     }
 
+    // Синхронизирует доступность кнопок и полей с текущим этапом стартового окна.
     private void SetNameInputsEnabled(bool isEnabled)
     {
         _firstNameBox.IsEnabled = isEnabled;

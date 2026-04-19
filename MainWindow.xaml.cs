@@ -14,6 +14,11 @@ namespace AbacaWpf;
 
 public partial class MainWindow : Window
 {
+    // Design size for the fixed game surface inside the Viewbox.
+    private const double DesignWidth = 1800;
+    private const double DesignHeight = 950;
+
+    // Board geometry and table markers.
     private const int DiceCount = 5;
     private const int PlayerCount = 2;
     private const int RowCount = 16;
@@ -22,6 +27,7 @@ public partial class MainWindow : Window
     private const double DiceSize = 100;
     private const double DiceHorizontalGap = DiceSize / 2;
 
+    // Runtime game state and UI cell references.
     private readonly Random _random = new();
     private readonly DispatcherTimer _rollTimer;
     private readonly Player[] _players = [new(), new()];
@@ -46,6 +52,7 @@ public partial class MainWindow : Window
     private bool _isRolling;
     private bool _computerTurnInProgress;
 
+    // Window startup and initial control construction.
     public MainWindow()
     {
         InitializeComponent();
@@ -54,6 +61,7 @@ public partial class MainWindow : Window
         BuildTables();
         BuildCombinationButtons();
         BuildDice();
+        SourceInitialized += (_, _) => ApplyResponsiveWindowBounds();
         Loaded += (_, _) =>
         {
             StartNewGame();
@@ -63,6 +71,16 @@ public partial class MainWindow : Window
 
     private Player CurrentPlayer => _players[_currentPlayerIndex];
 
+    private void ApplyResponsiveWindowBounds()
+    {
+        var workArea = SystemParameters.WorkArea;
+        MinWidth = Math.Min(DesignWidth, workArea.Width);
+        MinHeight = Math.Min(DesignHeight, workArea.Height);
+        Width = Math.Min(DesignWidth, workArea.Width);
+        Height = Math.Min(DesignHeight, workArea.Height);
+    }
+
+    // Game setup: asks for players and resets all state before the first turn.
     private void StartNewGame()
     {
         var dialog = new StartGameWindow(_random) { Owner = this };
@@ -85,6 +103,7 @@ public partial class MainWindow : Window
         StartNextTurn();
     }
 
+    // Table construction and cell rendering.
     private void BuildTables()
     {
         BuildPlayerTable(PlayerOneTable, 0);
@@ -181,6 +200,7 @@ public partial class MainWindow : Window
         return label;
     }
 
+    // Bottom combination buttons and dice visuals.
     private void BuildCombinationButtons()
     {
         CombinationButtons.Items.Clear();
@@ -274,6 +294,7 @@ public partial class MainWindow : Window
         return label;
     }
 
+    // Dice rendering, animation, and mouse selection.
     private static Image CreateDiceFace(int value)
     {
         return new Image
@@ -305,6 +326,7 @@ public partial class MainWindow : Window
         }
     }
 
+    // Turn flow: starts/stops rolling and prepares the next player.
     private void StartNextTurn()
     {
         UpdateScorePanel();
@@ -378,6 +400,7 @@ public partial class MainWindow : Window
         BuildDice();
     }
 
+    // Combination validation, scoring rules, and prize resolution.
     private void ScoreCombination(int row, bool fromComputer = false)
     {
         if (_computerTurnInProgress && !fromComputer)
@@ -537,6 +560,7 @@ public partial class MainWindow : Window
         WriteCell(playerIndex, row, column, 0);
     }
 
+    // Table write effects: numbers, crosses, and last-move highlight.
     private void WriteCell(int playerIndex, int row, int column, int score)
     {
         var cell = _cells[playerIndex, row, column];
@@ -635,6 +659,7 @@ public partial class MainWindow : Window
         }
     }
 
+    // Score panel, enabled/disabled controls, and end-of-game messaging.
     private bool IsGameOver()
     {
         if (_currentPlayerIndex != 1 || !CurrentPlayer.IsAllColumnBusy(ColumnCount - 2))
@@ -905,6 +930,7 @@ public partial class MainWindow : Window
             writer.Write((byte)character);
     }
 
+    // Keyboard shortcuts for dice navigation and quick combination writes.
     private void Window_KeyDown(object sender, KeyEventArgs e)
     {
         if (_computerTurnInProgress || CurrentPlayer.IsComputer)
@@ -995,6 +1021,7 @@ public partial class MainWindow : Window
         BuildDice();
     }
 
+    // Computer turn loop and simple move selection strategy.
     private async void BeginComputerTurn()
     {
         if (_computerTurnInProgress)
@@ -1160,6 +1187,7 @@ public partial class MainWindow : Window
             _fixedDice[i] = _dice[i] == keepValue;
     }
 
+    // Player state and helpers for occupied rows/columns.
     private sealed class Player
     {
         public Player(string name = "Игрок", bool isComputer = false, ComputerDifficulty difficulty = ComputerDifficulty.Normal)
