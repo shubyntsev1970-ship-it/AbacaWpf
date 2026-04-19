@@ -873,7 +873,8 @@ public partial class MainWindow : Window
         const int sampleRate = 22050;
         const short bitsPerSample = 16;
         const short channels = 1;
-        const double durationSeconds = 0.34;
+        const double durationSeconds = 0.54;
+        double[] impactTimes = [0.012, 0.064, 0.132, 0.214, 0.318, 0.438];
 
         var sampleCount = (int)(sampleRate * durationSeconds);
         var dataSize = sampleCount * channels * bitsPerSample / 8;
@@ -898,12 +899,30 @@ public partial class MainWindow : Window
         for (var i = 0; i < sampleCount; i++)
         {
             var time = i / (double)sampleRate;
-            var envelope = Math.Sin(Math.PI * i / sampleCount);
-            var burst = Math.Abs(Math.Sin(2 * Math.PI * 18 * time));
-            var click = noise.NextDouble() * 2 - 1;
-            var tone = Math.Sin(2 * Math.PI * 460 * time) * 0.18;
-            var sample = (short)((click * 0.58 + tone) * burst * envelope * short.MaxValue * 0.55);
-            writer.Write(sample);
+            var value = 0.0;
+
+            for (var impactIndex = 0; impactIndex < impactTimes.Length; impactIndex++)
+            {
+                var age = time - impactTimes[impactIndex];
+                if (age < 0)
+                    continue;
+
+                var strength = 1.0 - impactIndex * 0.09;
+                var tapEnvelope = Math.Exp(-age * 68);
+                var knockEnvelope = Math.Exp(-age * 22);
+                var bodyEnvelope = Math.Exp(-age * 15);
+                var grain = (noise.NextDouble() * 2 - 1) * tapEnvelope * 0.055;
+                var knock = Math.Sin(2 * Math.PI * (92 + impactIndex * 5) * age) * knockEnvelope * 0.58;
+                var body = Math.Sin(2 * Math.PI * (46 + impactIndex * 3) * age) * bodyEnvelope * 0.38;
+                var thud = Math.Sin(2 * Math.PI * (31 + impactIndex * 2) * age) * Math.Exp(-age * 12) * 0.2;
+                value += (grain + knock + body + thud) * strength;
+            }
+
+            // Gentle damping keeps the synthesized wooden knocks short and dry.
+            var fadeOut = Math.Clamp((durationSeconds - time) / 0.08, 0, 1);
+            value *= fadeOut;
+            value = Math.Clamp(value * 0.82, -1, 1);
+            writer.Write((short)(value * short.MaxValue));
         }
 
         stream.Position = 0;
