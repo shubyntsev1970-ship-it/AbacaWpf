@@ -4,8 +4,8 @@
         Title="Abaca"
         Width="1800"
         Height="950"
-        MinWidth="800"
-        MinHeight="600"
+        MinWidth="1800"
+        MinHeight="950"
         WindowState="Maximized"
         WindowStartupLocation="CenterScreen"
         Background="#101820"
@@ -34,22 +34,20 @@
         </Style>
     </Window.Resources>
 
-    <Grid Background="#101820">
-        <Viewbox Stretch="Uniform" StretchDirection="DownOnly">
-            <DockPanel Width="1800" Height="950">
-                <Menu DockPanel.Dock="Top" Background="#0B1117" Foreground="#F8FAFC" FontSize="28">
-                    <MenuItem Header="_Game" Background="#0B1117" Foreground="#F8FAFC">
-                        <MenuItem Header="_New game" Click="NewGame_Click" Foreground="#111827"/>
-                        <Separator/>
-                        <MenuItem Header="_Exit" Click="Exit_Click" Foreground="#111827"/>
-                    </MenuItem>
-                    <MenuItem Header="_Help" Background="#0B1117" Foreground="#F8FAFC">
-                        <MenuItem Header="_Rules" Click="Rules_Click" Foreground="#111827"/>
-                        <MenuItem Header="_About" Click="About_Click" Foreground="#111827"/>
-                    </MenuItem>
-                </Menu>
+    <DockPanel>
+        <Menu DockPanel.Dock="Top" Background="#0B1117" Foreground="#F8FAFC" FontSize="28">
+            <MenuItem Header="_Game" Background="#0B1117" Foreground="#F8FAFC">
+                <MenuItem Header="_New game" Click="NewGame_Click" Foreground="#111827"/>
+                <Separator/>
+                <MenuItem Header="_Exit" Click="Exit_Click" Foreground="#111827"/>
+            </MenuItem>
+            <MenuItem Header="_Help" Background="#0B1117" Foreground="#F8FAFC">
+                <MenuItem Header="_Rules" Click="Rules_Click" Foreground="#111827"/>
+                <MenuItem Header="_About" Click="About_Click" Foreground="#111827"/>
+            </MenuItem>
+        </Menu>
 
-                <Grid Margin="18">
+        <Grid Margin="18">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
@@ -145,8 +143,6 @@
                     </ItemsControl.ItemsPanel>
                 </ItemsControl>
             </Border>
-                </Grid>
-            </DockPanel>
-        </Viewbox>
-    </Grid>
+        </Grid>
+    </DockPanel>
 </Window>

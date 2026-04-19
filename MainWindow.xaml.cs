@@ -14,10 +14,6 @@ namespace AbacaWpf;
 
 public partial class MainWindow : Window
 {
-    // Design size for the fixed game surface inside the Viewbox.
-    private const double DesignWidth = 1800;
-    private const double DesignHeight = 950;
-
     // Board geometry and table markers.
     private const int DiceCount = 5;
     private const int PlayerCount = 2;
@@ -61,7 +57,6 @@ public partial class MainWindow : Window
         BuildTables();
         BuildCombinationButtons();
         BuildDice();
-        SourceInitialized += (_, _) => ApplyResponsiveWindowBounds();
         Loaded += (_, _) =>
         {
             StartNewGame();
@@ -70,15 +65,6 @@ public partial class MainWindow : Window
     }
 
     private Player CurrentPlayer => _players[_currentPlayerIndex];
-
-    private void ApplyResponsiveWindowBounds()
-    {
-        var workArea = SystemParameters.WorkArea;
-        MinWidth = Math.Min(DesignWidth, workArea.Width);
-        MinHeight = Math.Min(DesignHeight, workArea.Height);
-        Width = Math.Min(DesignWidth, workArea.Width);
-        Height = Math.Min(DesignHeight, workArea.Height);
-    }
 
     // Game setup: asks for players and resets all state before the first turn.
     private void StartNewGame()
