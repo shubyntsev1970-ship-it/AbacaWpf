@@ -14,6 +14,8 @@ namespace AbacaWpf;
 
 public partial class MainWindow : Window
 {
+    private const double TableLineThickness = 2.5;
+
     // Board geometry and table markers.
     private const int DiceCount = 5;
     private const int PlayerCount = 2;
@@ -32,6 +34,7 @@ public partial class MainWindow : Window
     private readonly bool[] _selectedDice = new bool[DiceCount];
     private readonly TextBlock[,,] _cells = new TextBlock[PlayerCount, RowCount, ColumnCount];
     private readonly SoundPlayer _diceSoundPlayer = new(CreateDiceRollSound());
+    private readonly SoundPlayer _victorySoundPlayer = new(CreateVictorySound());
     private Border? _lastMoveBorder;
     private int _lastMoveRow = -1;
     private readonly string[] _rowLabels =
@@ -129,7 +132,7 @@ public partial class MainWindow : Window
         var border = new Border
         {
             BorderBrush = new SolidColorBrush(Color.FromRgb(118, 144, 160)),
-            BorderThickness = new Thickness(1),
+            BorderThickness = new Thickness(TableLineThickness),
             Background = row == 0 || column == 0 ? new SolidColorBrush(Color.FromRgb(33, 78, 114)) : Brushes.Transparent
         };
         var fontSize = column == 0 && row > 0 ? 22 : text.Length > 7 ? 12 : text.Length > 4 ? 14 : 16;
@@ -145,7 +148,7 @@ public partial class MainWindow : Window
         var border = new Border
         {
             BorderBrush = new SolidColorBrush(Color.FromRgb(138, 160, 174)),
-            BorderThickness = new Thickness(1),
+            BorderThickness = new Thickness(TableLineThickness),
             Background = row >= 7 && row <= 15 ? Brushes.White : new SolidColorBrush(Color.FromRgb(247, 251, 253))
         };
         var content = new Grid();
@@ -601,7 +604,7 @@ public partial class MainWindow : Window
             ? Brushes.White
             : new SolidColorBrush(Color.FromRgb(247, 251, 253));
         border.BorderBrush = new SolidColorBrush(Color.FromRgb(138, 160, 174));
-        border.BorderThickness = new Thickness(1);
+        border.BorderThickness = new Thickness(TableLineThickness);
     }
 
     private static Border? GetCellBorder(TextBlock cell)
@@ -651,14 +654,20 @@ public partial class MainWindow : Window
         if (_currentPlayerIndex != 1 || !CurrentPlayer.IsAllColumnBusy(ColumnCount - 2))
             return false;
 
-        var message = _players[0].Score == _players[1].Score
-            ? "НИЧЬЯ!"
+        var isDraw = _players[0].Score == _players[1].Score;
+        var winner = isDraw
+            ? null
             : _players[0].Score > _players[1].Score
-                ? $"Победил {_players[0].Name}: +{_players[0].Score - _players[1].Score} очков"
-                : $"Победил {_players[1].Name}: +{_players[1].Score - _players[0].Score} очков";
+                ? _players[0]
+                : _players[1];
+        var scoreDifference = Math.Abs(_players[0].Score - _players[1].Score);
+        var message = isDraw
+            ? "НИЧЬЯ!"
+            : $"Победил {winner!.Name}: +{scoreDifference} очков";
 
         UpdateScorePanel();
-        ShowLargeMessage("Игра закончена", message);
+        ShowWinnerMessage(winner?.Name, message, scoreDifference);
+        Close();
         return true;
     }
 
@@ -853,6 +862,247 @@ public partial class MainWindow : Window
         dialog.ShowDialog();
     }
 
+    private void ShowWinnerMessage(string? winnerName, string message, int scoreDifference)
+    {
+        var titleText = winnerName is null ? "Ничья!" : "Победитель";
+        var nameText = winnerName ?? "Победила дружба";
+        var detailsText = winnerName is null
+            ? "Счет равный. Отличная партия!"
+            : $"+{scoreDifference} очков";
+
+        var trophy = new Image
+        {
+            Source = new BitmapImage(new Uri("pack://application:,,,/Assets/WinnerTrophy.png")),
+            Stretch = Stretch.UniformToFill,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        var trophyFrame = new Border
+        {
+            Height = 300,
+            Margin = new Thickness(28, 24, 28, 12),
+            CornerRadius = new CornerRadius(8),
+            ClipToBounds = true,
+            BorderThickness = new Thickness(2),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(255, 226, 124)),
+            Child = trophy
+        };
+
+        var titleBlock = new TextBlock
+        {
+            Text = titleText,
+            FontSize = 30,
+            FontWeight = FontWeights.Bold,
+            Foreground = new SolidColorBrush(Color.FromRgb(255, 236, 152)),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            TextAlignment = TextAlignment.Center,
+            Margin = new Thickness(24, 0, 24, 4)
+        };
+
+        var winnerBlock = new TextBlock
+        {
+            Text = nameText,
+            FontSize = 42,
+            FontWeight = FontWeights.ExtraBold,
+            Foreground = new SolidColorBrush(Color.FromRgb(255, 255, 255)),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            TextAlignment = TextAlignment.Center,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(36, 0, 36, 2)
+        };
+
+        var detailBlock = new TextBlock
+        {
+            Text = detailsText,
+            FontSize = 24,
+            FontWeight = FontWeights.Bold,
+            Foreground = new SolidColorBrush(Color.FromRgb(255, 213, 108)),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            TextAlignment = TextAlignment.Center,
+            Margin = new Thickness(24, 0, 24, 14)
+        };
+
+        var messageBlock = new TextBlock
+        {
+            Text = message,
+            FontSize = 20,
+            Foreground = new SolidColorBrush(Color.FromRgb(232, 240, 247)),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            TextAlignment = TextAlignment.Center,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(28, 0, 28, 18)
+        };
+
+        var okButton = new Button
+        {
+            Content = "OK",
+            Width = 140,
+            Height = 48,
+            FontSize = 22,
+            FontWeight = FontWeights.Bold,
+            Margin = new Thickness(0, 0, 0, 24),
+            IsDefault = true
+        };
+
+        var content = new StackPanel
+        {
+            Children =
+            {
+                trophyFrame,
+                titleBlock,
+                winnerBlock,
+                detailBlock,
+                messageBlock,
+                okButton
+            }
+        };
+
+        var decorations = new Canvas
+        {
+            IsHitTestVisible = false
+        };
+        AddCoin(decorations, 40, 452, 44, -16);
+        AddCoin(decorations, 87, 494, 34, 11);
+        AddCoin(decorations, 598, 446, 42, 14);
+        AddCoin(decorations, 548, 506, 32, -12);
+        AddSparkle(decorations, 66, 72, 22, 0);
+        AddSparkle(decorations, 598, 86, 18, 0.18);
+        AddSparkle(decorations, 116, 384, 16, 0.33);
+        AddSparkle(decorations, 562, 382, 20, 0.48);
+
+        var framedContent = new Border
+        {
+            Margin = new Thickness(20),
+            CornerRadius = new CornerRadius(10),
+            BorderThickness = new Thickness(4),
+            BorderBrush = new LinearGradientBrush(
+                Color.FromRgb(255, 241, 156),
+                Color.FromRgb(184, 112, 25),
+                45),
+            Background = new LinearGradientBrush(
+                Color.FromRgb(54, 34, 24),
+                Color.FromRgb(113, 67, 20),
+                90),
+            Child = content
+        };
+
+        var root = new Grid
+        {
+            Background = new LinearGradientBrush(
+                Color.FromRgb(28, 18, 16),
+                Color.FromRgb(95, 55, 18),
+                90),
+            Children =
+            {
+                decorations,
+                framedContent
+            }
+        };
+
+        var dialog = new Window
+        {
+            Title = "Игра закончена",
+            Owner = this,
+            Width = 700,
+            Height = 660,
+            MinWidth = 620,
+            MinHeight = 560,
+            ResizeMode = ResizeMode.NoResize,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Background = new LinearGradientBrush(
+                Color.FromRgb(35, 24, 20),
+                Color.FromRgb(80, 49, 18),
+                90),
+            Content = root
+        };
+
+        okButton.HorizontalAlignment = HorizontalAlignment.Center;
+        okButton.Click += (_, _) => dialog.Close();
+        PlayVictorySound();
+        dialog.ShowDialog();
+    }
+
+    private static void AddCoin(Canvas canvas, double left, double top, double size, double angle)
+    {
+        var coin = new Ellipse
+        {
+            Width = size,
+            Height = size * 0.42,
+            Fill = new RadialGradientBrush(
+                Color.FromRgb(255, 245, 159),
+                Color.FromRgb(213, 136, 24)),
+            Stroke = new SolidColorBrush(Color.FromRgb(255, 222, 95)),
+            StrokeThickness = 2,
+            RenderTransform = new RotateTransform(angle, size / 2, size * 0.21)
+        };
+
+        Canvas.SetLeft(coin, left);
+        Canvas.SetTop(coin, top);
+        canvas.Children.Add(coin);
+    }
+
+    private static void AddSparkle(Canvas canvas, double left, double top, double size, double delaySeconds)
+    {
+        var sparkle = new Polygon
+        {
+            Points =
+            [
+                new Point(size / 2, 0),
+                new Point(size * 0.62, size * 0.38),
+                new Point(size, size / 2),
+                new Point(size * 0.62, size * 0.62),
+                new Point(size / 2, size),
+                new Point(size * 0.38, size * 0.62),
+                new Point(0, size / 2),
+                new Point(size * 0.38, size * 0.38)
+            ],
+            Fill = new SolidColorBrush(Color.FromRgb(255, 246, 172)),
+            Opacity = 0.82,
+            RenderTransformOrigin = new Point(0.5, 0.5),
+            RenderTransform = new ScaleTransform(0.78, 0.78)
+        };
+
+        Canvas.SetLeft(sparkle, left);
+        Canvas.SetTop(sparkle, top);
+        canvas.Children.Add(sparkle);
+
+        var opacity = new DoubleAnimation(0.38, 1, TimeSpan.FromMilliseconds(760))
+        {
+            AutoReverse = true,
+            BeginTime = TimeSpan.FromSeconds(delaySeconds),
+            RepeatBehavior = RepeatBehavior.Forever
+        };
+        sparkle.BeginAnimation(OpacityProperty, opacity);
+
+        if (sparkle.RenderTransform is ScaleTransform scale)
+        {
+            var pulse = new DoubleAnimation(0.78, 1.2, TimeSpan.FromMilliseconds(760))
+            {
+                AutoReverse = true,
+                BeginTime = TimeSpan.FromSeconds(delaySeconds),
+                RepeatBehavior = RepeatBehavior.Forever
+            };
+            scale.BeginAnimation(ScaleTransform.ScaleXProperty, pulse);
+            scale.BeginAnimation(ScaleTransform.ScaleYProperty, pulse);
+        }
+    }
+
+    private void PlayVictorySound()
+    {
+        try
+        {
+            _victorySoundPlayer.Stop();
+            if (_victorySoundPlayer.Stream is not null)
+                _victorySoundPlayer.Stream.Position = 0;
+            _victorySoundPlayer.Play();
+        }
+        catch
+        {
+            SystemSounds.Exclamation.Play();
+        }
+    }
+
     private void PlayDiceRollSound()
     {
         try
@@ -922,6 +1172,62 @@ public partial class MainWindow : Window
             var fadeOut = Math.Clamp((durationSeconds - time) / 0.08, 0, 1);
             value *= fadeOut;
             value = Math.Clamp(value * 0.82, -1, 1);
+            writer.Write((short)(value * short.MaxValue));
+        }
+
+        stream.Position = 0;
+        return stream;
+    }
+
+    private static MemoryStream CreateVictorySound()
+    {
+        const int sampleRate = 22050;
+        const short bitsPerSample = 16;
+        const short channels = 1;
+        const double durationSeconds = 1.15;
+        double[] noteStarts = [0.02, 0.2, 0.38, 0.64];
+        double[] noteFrequencies = [523.25, 659.25, 783.99, 1046.5];
+
+        var sampleCount = (int)(sampleRate * durationSeconds);
+        var dataSize = sampleCount * channels * bitsPerSample / 8;
+        var stream = new MemoryStream();
+        using var writer = new BinaryWriter(stream, System.Text.Encoding.ASCII, leaveOpen: true);
+
+        WriteAscii(writer, "RIFF");
+        writer.Write(36 + dataSize);
+        WriteAscii(writer, "WAVE");
+        WriteAscii(writer, "fmt ");
+        writer.Write(16);
+        writer.Write((short)1);
+        writer.Write(channels);
+        writer.Write(sampleRate);
+        writer.Write(sampleRate * channels * bitsPerSample / 8);
+        writer.Write((short)(channels * bitsPerSample / 8));
+        writer.Write(bitsPerSample);
+        WriteAscii(writer, "data");
+        writer.Write(dataSize);
+
+        for (var i = 0; i < sampleCount; i++)
+        {
+            var time = i / (double)sampleRate;
+            var value = 0.0;
+
+            for (var noteIndex = 0; noteIndex < noteStarts.Length; noteIndex++)
+            {
+                var age = time - noteStarts[noteIndex];
+                if (age < 0)
+                    continue;
+
+                var envelope = Math.Min(age / 0.035, 1) * Math.Exp(-age * (noteIndex == noteStarts.Length - 1 ? 2.4 : 5.4));
+                var frequency = noteFrequencies[noteIndex];
+                var bell = Math.Sin(2 * Math.PI * frequency * age) * 0.42;
+                var bright = Math.Sin(2 * Math.PI * frequency * 2 * age) * 0.13;
+                var warm = Math.Sin(2 * Math.PI * frequency * 0.5 * age) * 0.1;
+                value += (bell + bright + warm) * envelope;
+            }
+
+            var fadeOut = Math.Clamp((durationSeconds - time) / 0.16, 0, 1);
+            value = Math.Clamp(value * fadeOut * 0.82, -1, 1);
             writer.Write((short)(value * short.MaxValue));
         }
 

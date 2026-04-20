@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package
+    Name="Abaca"
+    Manufacturer="Abaca"
+    Version="1.0.0.0"
+    UpgradeCode="1BA72D33-5B1D-4CDE-9D6A-09780EAB17E1"
+    Scope="perUser">
+
+    <SummaryInformation Description="Abaca game installer" Manufacturer="Abaca" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Abaca is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <Icon Id="Abaca.ico" SourceFile="..\..\Assets\AppIcon.ico" />
+
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="ProgramsRootFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="Abaca" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="Abaca" />
+    </StandardDirectory>
+
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="AbacaExecutableComponent" Guid="8D493031-0783-44FB-BD03-339CA5BED857">
+        <File Id="AbacaExe" Source="$(var.AbacaPublishDir)\Abaca.exe" />
+        <Shortcut
+          Id="ApplicationStartMenuShortcut"
+          Directory="ApplicationProgramsFolder"
+          Name="Abaca"
+          Description="Launch Abaca"
+          Target="[INSTALLFOLDER]Abaca.exe"
+          WorkingDirectory="INSTALLFOLDER"
+          Icon="Abaca.ico" />
+        <RemoveFolder Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall" />
+        <RemoveFolder Id="RemoveProgramsRootFolder" Directory="ProgramsRootFolder" On="uninstall" />
+        <RegistryValue Root="HKCU" Key="Software\Abaca" Name="InstallPath" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <DirectoryRef Id="ApplicationProgramsFolder">
+      <Component Id="ApplicationProgramsFolderComponent" Guid="C6117B23-15FA-4D79-B7A0-42E73650F941">
+        <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
+        <RegistryValue Root="HKCU" Key="Software\Abaca" Name="Installed" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <Feature Id="MainFeature" Title="Abaca" Level="1">
+      <ComponentRef Id="AbacaExecutableComponent" />
+      <ComponentRef Id="ApplicationProgramsFolderComponent" />
+    </Feature>
+  </Package>
+</Wix>

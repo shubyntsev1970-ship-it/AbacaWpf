@@ -1,0 +1,28 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+
+  <PropertyGroup>
+    <OutputName>Abaca_WiX_Setup</OutputName>
+    <OutputType>Package</OutputType>
+    <Platform>x64</Platform>
+    <AbacaPublishDir>$(MSBuildThisFileDirectory)..\..\bin\Release\AbacaPublish</AbacaPublishDir>
+    <DefineConstants>AbacaPublishDir=$(AbacaPublishDir)</DefineConstants>
+    <SuppressIces>ICE91</SuppressIces>
+  </PropertyGroup>
+
+  <Target Name="PublishAbaca" BeforeTargets="BeforeBuild">
+    <MSBuild
+      Projects="$(MSBuildThisFileDirectory)..\..\AbacaWpf.csproj"
+      Targets="Restore"
+      Properties="Configuration=Release;RuntimeIdentifier=win-x64;SelfContained=true" />
+    <MSBuild
+      Projects="$(MSBuildThisFileDirectory)..\..\AbacaWpf.csproj"
+      Targets="Publish"
+      Properties="Configuration=Release;RuntimeIdentifier=win-x64;SelfContained=true;PublishSingleFile=true;IncludeNativeLibrariesForSelfExtract=true;EnableCompressionInSingleFile=true;DebugType=None;DebugSymbols=false;PublishDir=$(AbacaPublishDir)\" />
+  </Target>
+
+  <Target Name="CopyMsiToDist" AfterTargets="Build" Condition="Exists('$(TargetPath)')">
+    <MakeDir Directories="$(MSBuildThisFileDirectory)..\..\dist" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFiles="$(MSBuildThisFileDirectory)..\..\dist\Abaca_WiX_Setup.msi" />
+  </Target>
+
+</Project>

@@ -1,0 +1,114 @@
+Да. Сейчас инсталлятор Abaca_Setup.exe собирается не через WiX/MSI, а как самодельный .NET setup-exe:
+
+сначала публикуется игра Abaca.exe;
+потом создается отдельная маленькая консольная программа Abaca_Setup.exe;
+внутрь этой программы как embedded resource кладется Abaca.exe;
+при запуске установщик распаковывает Abaca.exe в:
+C:\Users\<User>\AppData\Local\Programs\Abaca\Abaca.exe
+создает ярлыки в меню Пуск и на рабочем столе;
+добавляет запись удаления в реестр текущего пользователя;
+старую папку ABACA WPF удаляет.
+
+То есть это не классический .msi, а portable/self-contained установщик .exe.
+Из обычной PowerShell-консоли:
+# 1. Опубликовать саму игру
+$out = 'D:\Project\AbacaWpf\bin\Release\AbacaPublish'
+
+if (Test-Path $out) {
+    Remove-Item -LiteralPath $out -Recurse -Force
+}
+
+dotnet publish D:\Project\AbacaWpf\AbacaWpf.csproj `
+    -c Release `
+    -r win-x64 `
+    --self-contained true `
+    -o $out `
+    -p:PublishSingleFile=true `
+    -p:IncludeNativeLibrariesForSelfExtract=true `
+    -p:EnableCompressionInSingleFile=true `
+    -p:DebugType=None `
+    -p:DebugSymbols=false
+
+	
+	После этого должен появиться:
+D:\Project\AbacaWpf\bin\Release\AbacaPublish\Abaca.exe
+	
+	Дальше собирается сам установщик. Для этого нужен отдельный проект AbacaSetupBuilder. Я обычно создавал его временно здесь:
+	
+	D:\Project\CITestExampleSln\AbacaSetupBuilder
+Структура такая:
+AbacaSetupBuilder
+├─ AbacaSetupBuilder.csproj
+├─ Program.cs
+├─ AppIcon.ico
+└─ Payload
+   └─ Abaca.exe
+
+AbacaSetupBuilder.csproj должен быть примерно такой:
+
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Abaca_Setup</AssemblyName>
+    <ApplicationIcon>AppIcon.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Payload\Abaca.exe" LogicalName="Abaca.exe" />
+  </ItemGroup>
+</Project>
+
+Потом копируются файлы:
+New-Item -ItemType Directory -Force `
+    -Path D:\Project\CITestExampleSln\AbacaSetupBuilder\Payload
+
+Copy-Item `
+    -LiteralPath D:\Project\AbacaWpf\bin\Release\AbacaPublish\Abaca.exe `
+    -Destination D:\Project\CITestExampleSln\AbacaSetupBuilder\Payload\Abaca.exe `
+    -Force
+
+Copy-Item `
+    -LiteralPath D:\Project\AbacaWpf\Assets\AppIcon.ico `
+    -Destination D:\Project\CITestExampleSln\AbacaSetupBuilder\AppIcon.ico `
+    -Force
+
+Затем публикуется установщик:
+dotnet publish D:\Project\CITestExampleSln\AbacaSetupBuilder\AbacaSetupBuilder.csproj `
+    -c Release `
+    -r win-x64 `
+    --self-contained true `
+    -p:PublishSingleFile=true `
+    -p:IncludeNativeLibrariesForSelfExtract=true `
+    -p:EnableCompressionInSingleFile=true `
+    -p:DebugType=None `
+    -p:DebugSymbols=false
+Готовый файл будет здесь:
+
+D:\Project\CITestExampleSln\AbacaSetupBuilder\bin\Release\net10.0-windows\win-x64\publish\Abaca_Setup.exe
+
+Его надо скопировать в папку проекта:
+Copy-Item `
+    -LiteralPath D:\Project\CITestExampleSln\AbacaSetupBuilder\bin\Release\net10.0-windows\win-x64\publish\Abaca_Setup.exe `
+    -Destination D:\Project\AbacaWpf\dist\Abaca_Setup.exe `
+    -Force
+Проверка установки:
+D:\Project\AbacaWpf\dist\Abaca_Setup.exe /silent
+
+Get-Item `
+    (Join-Path $env:LOCALAPPDATA 'Programs\Abaca\Abaca.exe'), `
+    D:\Project\AbacaWpf\bin\Release\AbacaPublish\Abaca.exe |
+Select-Object FullName, Length, @{
+    Name = 'Hash'
+    Expression = {
+        (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash
+    }
+}
+Если хэши совпали, значит установленная программа точно такая же, как опубликованная.
+
+	
+	
+
+	
