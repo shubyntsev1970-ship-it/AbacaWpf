@@ -415,61 +415,15 @@ public partial class MainWindow : Window
             return;
         }
 
+        if (!fromComputer && _rollCount == 1 && row >= 6 && score == 0)
+        {
+            if (!ShowCrossOutConfirmation(row))
+                return;
+        }
+
         WriteTable(row, column, score);
         if (!IsGameOver())
             StartNextTurn();
-    }
-
-    private int CalculateScore(int row)
-    {
-        if (row < 6)
-        {
-            var number = row + 1;
-            return number * _dice.Count(die => die == number) - number * 3;
-        }
-
-        var counts = Enumerable.Range(1, 6).ToDictionary(value => value, value => _dice.Count(die => die == value));
-        var score = row switch
-        {
-            6 => counts.Where(pair => pair.Value >= 2).Select(pair => pair.Key * 2).DefaultIfEmpty(0).Max(),
-            7 => TwoPairsScore(counts),
-            8 => counts.Where(pair => pair.Value >= 3).Select(pair => pair.Key * 3).DefaultIfEmpty(0).Max(),
-            9 => FullHouseScore(counts),
-            10 => Enumerable.Range(1, 5).All(value => counts[value] == 1) ? 15 : 0,
-            11 => Enumerable.Range(2, 5).All(value => counts[value] == 1) ? 20 : 0,
-            12 => counts.Where(pair => pair.Value >= 4).Select(pair => pair.Key * 4 + 20).DefaultIfEmpty(0).Max(),
-            13 => counts.Where(pair => pair.Value == 5).Select(pair => pair.Key * 5 + 50).DefaultIfEmpty(0).Max(),
-            14 => _dice.Sum(),
-            _ => 0
-        };
-
-        return _rollCount == 1 ? score * 2 : score;
-    }
-
-    private static int TwoPairsScore(Dictionary<int, int> counts)
-    {
-        var pairs = GetTwoPairValues(counts);
-        return pairs.Length == 2 ? pairs.Sum() * 2 : 0;
-    }
-
-    private static int[] GetTwoPairValues(Dictionary<int, int> counts)
-    {
-        return counts
-            .SelectMany(pair => Enumerable.Repeat(pair.Key, pair.Value / 2))
-            .OrderByDescending(value => value)
-            .Take(2)
-            .ToArray();
-    }
-
-    private static int FullHouseScore(Dictionary<int, int> counts)
-    {
-        var five = counts.FirstOrDefault(pair => pair.Value == 5);
-        if (five.Key > 0)
-            return five.Key * 5;
-
-        var triple = counts.Where(pair => pair.Value == 3).Select(pair => pair.Key).DefaultIfEmpty(0).Max();
-        var pairValue = counts.Where(pair => pair.Value == 2).Select(pair => pair.Key).DefaultIfEmpty(0).Max();
-        return triple > 0 && pairValue > 0 ? triple * 3 + pairValue * 2 : 0;
     }
 
     private void WriteTable(int row, int column, int score)
@@ -535,13 +489,16 @@ public partial class MainWindow : Window
 
     private void AwardColumnPrize(int row, int column)
     {
-        if (!CurrentPlayer.IsAllColumnBusy(column) || CurrentPlayer.Table[RowCount - 1, column] != EmptyCell)
+        if (!CurrentPlayer.IsAllColumnBusy(column))
             return;
 
-        var value = CurrentPlayer.GetMaxInColumn(column);
-        CurrentPlayer.SetBusyCell(RowCount - 1, column, value);
-        CurrentPlayer.Score += value;
-        WriteCell(_currentPlayerIndex, RowCount - 1, column, value);
+        if (CurrentPlayer.Table[RowCount - 1, column] == EmptyCell)
+        {
+            var value = CurrentPlayer.GetMaxInColumn(column);
+            CurrentPlayer.SetBusyCell(RowCount - 1, column, value);
+            CurrentPlayer.Score += value;
+            WriteCell(_currentPlayerIndex, RowCount - 1, column, value);
+        }
 
         if (column < ColumnCount - 2)
         {
@@ -872,6 +829,88 @@ public partial class MainWindow : Window
         };
         okButton.Click += (_, _) => dialog.Close();
         dialog.ShowDialog();
+    }
+
+    private bool ShowCrossOutConfirmation(int row)
+    {
+        var result = false;
+        var combinationName = GetRowCaption(row);
+        var titleBlock = new TextBlock
+        {
+            Text = "Комбинация не собрана",
+            FontSize = 30,
+            FontWeight = FontWeights.Bold,
+            Foreground = new SolidColorBrush(Color.FromRgb(255, 235, 180)),
+            Margin = new Thickness(26, 24, 26, 8),
+            TextAlignment = TextAlignment.Center
+        };
+        var messageBlock = new TextBlock
+        {
+            Text = $"Вы выбрали: {combinationName}\nВычеркнуть эту клетку?",
+            FontSize = 24,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = Brushes.White,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(28, 8, 28, 16),
+            TextAlignment = TextAlignment.Center
+        };
+        var hintBlock = new TextBlock
+        {
+            Text = "Нажмите \"Подтвердить\", если это осознанное вычеркивание.",
+            FontSize = 18,
+            Foreground = new SolidColorBrush(Color.FromRgb(178, 204, 221)),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(28, 0, 28, 22),
+            TextAlignment = TextAlignment.Center
+        };
+        var confirmButton = new Button
+        {
+            Content = "Подтвердить",
+            Width = 180,
+            Height = 52,
+            Margin = new Thickness(8),
+            Style = (Style)FindResource("CommandButton")
+        };
+        var cancelButton = new Button
+        {
+            Content = "Отказаться",
+            Width = 160,
+            Height = 52,
+            Margin = new Thickness(8),
+            Style = (Style)FindResource("CommandButton")
+        };
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(18, 0, 18, 24),
+            Children = { confirmButton, cancelButton }
+        };
+        var panel = new StackPanel
+        {
+            Background = new SolidColorBrush(Color.FromRgb(16, 30, 41)),
+            Children = { titleBlock, messageBlock, hintBlock, buttons }
+        };
+        var dialog = new Window
+        {
+            Title = "ABACA",
+            Width = 560,
+            Height = 330,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Owner = this,
+            ResizeMode = ResizeMode.NoResize,
+            Background = new SolidColorBrush(Color.FromRgb(16, 30, 41)),
+            Content = panel
+        };
+
+        confirmButton.Click += (_, _) =>
+        {
+            result = true;
+            dialog.Close();
+        };
+        cancelButton.Click += (_, _) => dialog.Close();
+        dialog.ShowDialog();
+        return result;
     }
 
     private void ShowWinnerMessage(string? winnerName, string message, int scoreDifference)

@@ -17,6 +17,9 @@ public partial class MainWindow
         if (best.Score <= 0)
             return false;
 
+        if (CurrentPlayer.Difficulty == ComputerDifficulty.Aggressive && IsTacticalPrizeMove(best.Row))
+            return true;
+
         if (best.Row == 14 && _rollCount == 1 && IsGoodOpeningSum())
             return true;
 
@@ -25,12 +28,16 @@ public partial class MainWindow
 
         if (best.Row == 12 && _rollCount == 2 && CanChaseAbaca())
             return false;
+        if (best.Row == 12 && !IsKareWorthRecording(GetDiceCounts()))
+            return false;
+        if (best.Row == 9 && !IsFullHouseWorthRecording(GetDiceCounts()))
+            return false;
 
         if (_rollCount == 1)
             return best.Row == 13
                 || best.Row == 12 && best.Score > 0
-                || best.Row == 7 && HasPremiumTwoPairs(GetDiceCounts())
-                || best.Row == 8 && best.Score > 0 && !HasStraightFork()
+                || best.Row == 7 && (HasPremiumTwoPairs(GetDiceCounts()) || IsTacticalPrizeMove(7))
+                || best.Row == 8 && best.Score > 0 && IsStrongOpeningTriple(GetDiceCounts()) && !HasStraightFork()
                 || best.Row == 9 && best.Score > 0
                 || best.Row is 10 or 11 && best.Score > 0;
 
@@ -59,17 +66,29 @@ public partial class MainWindow
         if (forcedPremiumRow >= 0)
             return new ComputerMove(forcedPremiumRow, CalculateScore(forcedPremiumRow), int.MaxValue);
 
+        var forcedTacticalPrizeRow = GetForcedTacticalPrizeMove();
+        if (forcedTacticalPrizeRow >= 0)
+            return new ComputerMove(forcedTacticalPrizeRow, CalculateScore(forcedTacticalPrizeRow), int.MaxValue);
+
         var forcedLowCostSchoolRow = GetForcedLowCostSchoolMove();
         if (forcedLowCostSchoolRow >= 0)
             return new ComputerMove(forcedLowCostSchoolRow, CalculateScore(forcedLowCostSchoolRow), int.MaxValue);
 
-        var forcedWeakPairRow = GetForcedWeakPairMove();
-        if (forcedWeakPairRow >= 0)
-            return new ComputerMove(forcedWeakPairRow, CalculateScore(forcedWeakPairRow), int.MaxValue);
-
         var forcedSchoolRow = GetForcedSchoolMove();
         if (forcedSchoolRow >= 0)
             return new ComputerMove(forcedSchoolRow, CalculateScore(forcedSchoolRow), int.MaxValue);
+
+        var forcedTripleRow = GetForcedTripleMove();
+        if (forcedTripleRow >= 0)
+            return new ComputerMove(forcedTripleRow, CalculateScore(forcedTripleRow), int.MaxValue);
+
+        var forcedWeakResultCrossOutRow = GetForcedWeakResultCrossOutMove();
+        if (forcedWeakResultCrossOutRow >= 0)
+            return new ComputerMove(forcedWeakResultCrossOutRow, CalculateScore(forcedWeakResultCrossOutRow), int.MaxValue);
+
+        var forcedWeakPairRow = GetForcedWeakPairMove();
+        if (forcedWeakPairRow >= 0)
+            return new ComputerMove(forcedWeakPairRow, CalculateScore(forcedWeakPairRow), int.MaxValue);
 
         var bestRow = -1;
         var bestAdjusted = int.MinValue;
@@ -87,6 +106,10 @@ public partial class MainWindow
             if (row < 6 && score < 0 && -score > CurrentPlayer.School && !CurrentPlayer.IsOnlySchoolFree())
                 continue;
             if (row < 6 && score < 0 && HasFreeCombinationMainCell() && !ShouldAllowNegativeSchool(row, score))
+                continue;
+            if (row == 12 && score > 0 && !IsKareWorthRecording(GetDiceCounts()))
+                continue;
+            if (row == 9 && score > 0 && !IsFullHouseWorthRecording(GetDiceCounts()))
                 continue;
 
             var adjusted = GetComputerMovePriority(row, score);
@@ -110,248 +133,6 @@ public partial class MainWindow
         return new ComputerMove(bestRow, CalculateScore(bestRow), bestAdjusted);
     }
 
-    // Мягкая оценка хода для ИИ.
-    // Она не запрещает ход напрямую, а добавляет/снимает очки приоритета:
-    // школа, баланс комбинаций, бонусы раздачи, призы по строкам/столбцам и заполнение таблицы.
-    private int GetComputerMovePriority(int row, int score)
-    {
-        var priority = score + GetDifficultyRowBonus(row, score);
-        var counts = GetDiceCounts();
-        var column = CurrentPlayer.GetFreeCell(row);
-
-        if (row < 6)
-        {
-            var value = row + 1;
-            var count = counts[value];
-            if (score >= 0)
-            {
-                priority += 22 + value * 3;
-                if (count >= 3)
-                    priority += 38 + value * 2;
-                if (CurrentPlayer.Table[row, 0] == EmptyCell)
-                    priority += 12;
-            }
-        }
-        else if (row < RowCount - 1)
-        {
-            priority += GetCombinationBalanceBonus(row, score);
-        }
-
-        if (_rollCount == 1)
-        {
-            if (row == 7 && score > 0)
-                priority += HasPremiumTwoPairs(counts) ? 54 : score >= 16 ? 12 : -10;
-            if (row == 8 && score > 0)
-                priority += counts.Any(pair => pair.Value == 3 && pair.Key >= 5) ? 62 : 40;
-            if (row == 9 && score > 0)
-                priority += 96;
-            if (row is 10 or 11 && score > 0)
-                priority += 82;
-            if (row == 12 && score > 0)
-                priority += 120;
-            if (row == 13 && score > 0)
-                priority += 160;
-        }
-
-        if (row == 14)
-            priority += _rollCount == 1 && IsGoodOpeningSum() ? 18 : _rollCount < 3 ? -36 : -16;
-        if (row == 14 && score < 21 && HasSacrificialCrossOutAvailable())
-            priority -= 34;
-
-        if (CompletesOwnRowPrize(row))
-            priority += OpponentCanClaimRowPrizeSoon(row) ? 72 : OpponentPrizeIsOpen(row, ColumnCount - 1) ? 34 : 16;
-        if (column >= 0 && column < ColumnCount - 1 && CompletesOwnColumnPrize(column))
-            priority += OpponentCanClaimColumnPrizeSoon(column) ? 64 : OpponentPrizeIsOpen(RowCount - 1, column) ? 30 : 14;
-        if (column >= 0 && column < ColumnCount - 1)
-            priority += GetTableFillBalanceBonus(row, column, score);
-
-        return priority;
-    }
-
-    // Подталкивает ИИ к комбинациям, если школа уже слишком заполнена.
-    // Это защита от перекоса, когда компьютер играет почти только школу и оставляет строки комбинаций пустыми.
-    private int GetCombinationBalanceBonus(int row, int score)
-    {
-        var bonus = 0;
-        if (ShouldPreferCombinationsOverSchool())
-            bonus += score > 0 ? 34 : 18;
-
-        if (row == 12 && CountBusyMainCellsInRow(row) == 0)
-            bonus += score > 0 ? 42 : 16;
-
-        if (row is 10 or 11 && CountBusyMainCellsInRow(row) == 0)
-            bonus += score > 0 ? 18 : 8;
-
-        return bonus;
-    }
-
-    // Слабый балансировщик таблицы: выгоднее закрывать менее заполненные строки и столбцы,
-    // но без жесткого запрета на другие ходы.
-    private int GetTableFillBalanceBonus(int row, int column, int score)
-    {
-        var bonus = 0;
-        var rowBusy = CountBusyMainCellsInRow(row);
-        var leastBusyRow = Enumerable.Range(0, RowCount - 1).Min(CountBusyMainCellsInRow);
-        if (rowBusy <= leastBusyRow + 1)
-            bonus += score > 0 ? 14 : 8;
-        else if (rowBusy >= 4 && !CompletesOwnRowPrize(row))
-            bonus -= 14;
-
-        var columnBusy = CountBusyMainCellsInColumn(column);
-        var leastBusyColumn = Enumerable.Range(0, ColumnCount - 1).Min(CountBusyMainCellsInColumn);
-        if (columnBusy <= leastBusyColumn + 2)
-            bonus += score > 0 ? 18 : 10;
-        else if (columnBusy >= 12 && !CompletesOwnColumnPrize(column))
-            bonus -= 12;
-
-        return bonus;
-    }
-
-    private int GetDifficultyRowBonus(int row, int score)
-    {
-        return CurrentPlayer.Difficulty switch
-        {
-            ComputerDifficulty.Careful when row < 6 && score >= 0 => 12,
-            ComputerDifficulty.Careful when row == 14 => 4,
-            ComputerDifficulty.Aggressive when row is >= 10 and <= 13 => 12,
-            ComputerDifficulty.Aggressive when row >= 6 && score > 0 => 5,
-            _ => 0
-        };
-    }
-
-    // Штраф за зачеркивание комбинации вместо записи очков.
-    // Редкие, но маловероятные строки можно вычеркивать раньше; каре, тройку и последний игровой столбец бережем.
-    private int GetComputerCrossOutPenalty(int row)
-    {
-        var penalty = row switch
-        {
-            13 => 0,  // абак: редкая комбинация, ее можно вычеркивать первой
-            11 => 3,  // большой стрит
-            10 => 4,  // малый стрит
-            9 => 10,  // фул
-            7 => 13,  // две пары
-            6 => 15,  // пара
-            12 => 28, // каре лучше беречь
-            8 => 30,  // тройку тоже не вычеркиваем рано
-            _ => 18
-        };
-
-        if (CompletesOwnRowPrize(row))
-            penalty -= 10;
-
-        penalty += CountCrossesInMainRow(row) * 24;
-        var column = CurrentPlayer.GetFreeCell(row);
-        if (column >= 0 && column < ColumnCount - 1)
-            penalty += CountCrossesInMainColumn(column) * 6;
-        if (column == ColumnCount - 2)
-            penalty += 80;
-
-        return Math.Max(0, penalty);
-    }
-
-    private bool HasSacrificialCrossOutAvailable()
-    {
-        return IsRowOpenForCrossOut(13) || IsRowOpenForCrossOut(11) || IsRowOpenForCrossOut(10);
-    }
-
-    private bool IsRowOpenForCrossOut(int row)
-    {
-        return CurrentPlayer.GetFreeCell(row) != -1 && CalculateScore(row) == 0;
-    }
-
-    private bool ShouldAllowNegativeSchool(int row, int score)
-    {
-        if (row > 2 || score >= 0)
-            return false;
-
-        return CurrentPlayer.School >= 6 && -score <= 3 && -score <= CurrentPlayer.School / 2;
-    }
-
-    private bool ShouldPreferCombinationsOverSchool()
-    {
-        var schoolCells = CountBusyMainCells(0, 6);
-        var combinationCells = CountBusyMainCells(6, RowCount - 1);
-        return schoolCells >= combinationCells + 6 || schoolCells >= 18 && combinationCells < 18;
-    }
-
-    private int CountBusyMainCells(int firstRow, int endRow)
-    {
-        var count = 0;
-        for (var row = firstRow; row < endRow; row++)
-            count += CountBusyMainCellsInRow(row);
-
-        return count;
-    }
-
-    private int CountBusyMainCellsInRow(int row)
-    {
-        var count = 0;
-        for (var column = 0; column < ColumnCount - 1; column++)
-        {
-            if (CurrentPlayer.Table[row, column] != EmptyCell)
-                count++;
-        }
-
-        return count;
-    }
-
-    private int CountBusyMainCellsInColumn(int column)
-    {
-        var count = 0;
-        for (var row = 0; row < RowCount - 1; row++)
-        {
-            if (CurrentPlayer.Table[row, column] != EmptyCell)
-                count++;
-        }
-
-        return count;
-    }
-
-    private int CountCrossesInMainRow(int row)
-    {
-        var count = 0;
-        for (var column = 0; column < ColumnCount - 1; column++)
-        {
-            if (CurrentPlayer.Table[row, column] == 0)
-                count++;
-        }
-
-        return count;
-    }
-
-    private int CountCrossesInMainColumn(int column)
-    {
-        var count = 0;
-        for (var row = 6; row < RowCount - 1; row++)
-        {
-            if (CurrentPlayer.Table[row, column] == 0)
-                count++;
-        }
-
-        return count;
-    }
-
-    private Dictionary<int, int> GetDiceCounts()
-    {
-        return Enumerable.Range(1, 6).ToDictionary(value => value, value => _dice.Count(die => die == value));
-    }
-
-    private int CountDice(int value) => _dice.Count(die => die == value);
-
-    private bool HasFreeCombinationMainCell()
-    {
-        for (var row = 6; row < RowCount - 1; row++)
-        {
-            for (var column = 0; column < ColumnCount - 1; column++)
-            {
-                if (CurrentPlayer.Table[row, column] == EmptyCell)
-                    return true;
-            }
-        }
-
-        return false;
-    }
-
     // Жесткие решения для готовых сильных ходов.
     // Этот блок срабатывает до общей оценки весов, чтобы ИИ не испортил очевидно сильную раздачу
     // и мог тактически закрыть/заблокировать приз даже не самым большим количеством очков.
@@ -359,22 +140,20 @@ public partial class MainWindow
     {
         var counts = GetDiceCounts();
 
-        if (CurrentPlayer.GetFreeCell(7) != -1 && TwoPairsScore(counts) > 0 && IsTacticalPrizeMove(7))
-            return 7;
-
         if (CurrentPlayer.GetFreeCell(13) != -1 && counts.Any(pair => pair.Value == 5))
             return 13;
+
+        var balancedSchoolRow = GetBalancedReadySchoolMove(counts);
+        if (balancedSchoolRow >= 0)
+            return balancedSchoolRow;
+
+        if (CurrentPlayer.GetFreeCell(12) != -1 && IsKareWorthRecording(counts) && (_rollCount >= 3 || !CanChaseAbaca()))
+            return 12;
 
         if (CurrentPlayer.GetFreeCell(12) != -1 && CurrentPlayer.School >= 6 && counts.Any(pair => pair.Value >= 4 && pair.Key >= 5))
             return 12;
 
-        if (_rollCount != 1)
-            return -1;
-
-        if (CurrentPlayer.GetFreeCell(12) != -1 && counts.Any(pair => pair.Value >= 4))
-            return 12;
-
-        if (CurrentPlayer.GetFreeCell(9) != -1 && FullHouseScore(counts) > 0)
+        if (_rollCount >= 2 && CurrentPlayer.GetFreeCell(9) != -1 && IsFullHouseWorthRecording(counts))
             return 9;
 
         if (CurrentPlayer.GetFreeCell(11) != -1 && CalculateScore(11) > 0)
@@ -383,11 +162,33 @@ public partial class MainWindow
         if (CurrentPlayer.GetFreeCell(10) != -1 && CalculateScore(10) > 0)
             return 10;
 
+        if (_rollCount != 1)
+            return -1;
+
+        if (CurrentPlayer.GetFreeCell(12) != -1 && counts.Any(pair => pair.Value >= 4))
+            return 12;
+
+        if (CurrentPlayer.GetFreeCell(9) != -1 && IsFullHouseWorthRecording(counts))
+            return 9;
+
+        var aggressivePrizeRaceRow = GetAggressiveOpeningPrizeRaceMove(counts);
+        if (aggressivePrizeRaceRow >= 0)
+            return aggressivePrizeRaceRow;
+
+        if (CurrentPlayer.GetFreeCell(7) != -1 && TwoPairsScore(counts) > 0 && IsTacticalPrizeMove(7))
+            return 7;
+
+        if (CurrentPlayer.GetFreeCell(7) != -1 && TwoPairsScore(counts) >= 18)
+            return 7;
+
+        if (CurrentPlayer.GetFreeCell(6) != -1 && PairScore(counts) >= 10 && ShouldTakeOpeningPair())
+            return 6;
+
+        if (CurrentPlayer.GetFreeCell(8) != -1 && counts.Any(pair => pair.Value >= 3))
+            return 8;
+
         if (ShouldTakeOpeningSum(counts))
             return 14;
-
-        if (CurrentPlayer.GetFreeCell(8) != -1 && counts.Any(pair => pair.Value == 3 && pair.Key >= 5))
-            return 8;
 
         if (CurrentPlayer.GetFreeCell(7) != -1 && HasPremiumTwoPairs(counts))
             return 7;
@@ -412,6 +213,42 @@ public partial class MainWindow
             || column >= 0 && column < ColumnCount - 1 && OpponentCanClaimColumnPrizeSoon(column);
     }
 
+    private int GetForcedTacticalPrizeMove()
+    {
+        return Enumerable.Range(0, RowCount - 1)
+            .Where(row => CurrentPlayer.GetFreeCell(row) != -1 && IsTacticalPrizeMove(row))
+            .Select(row => (Row: row, Score: CalculateScore(row)))
+            .Where(item => IsPlayableTacticalPrizeScore(item.Row, item.Score))
+            .OrderByDescending(item => GetTacticalPrizeUrgency(item.Row))
+            .ThenByDescending(item => item.Score)
+            .Select(item => item.Row)
+            .FirstOrDefault(-1);
+    }
+
+    private bool IsPlayableTacticalPrizeScore(int row, int score)
+    {
+        if (row < 6)
+            return CountDice(row + 1) > 0 && (score >= 0 || -score <= CurrentPlayer.School);
+
+        return score > 0;
+    }
+
+    private int GetTacticalPrizeUrgency(int row)
+    {
+        var column = CurrentPlayer.GetFreeCell(row);
+        var urgency = 0;
+        if (CompletesOwnRowPrize(row))
+            urgency += OpponentCanClaimRowPrizeSoon(row) ? 140 : 90;
+        if (OpponentCanClaimRowPrizeSoon(row))
+            urgency += 120;
+        if (column >= 0 && column < ColumnCount - 1 && CompletesOwnColumnPrize(column))
+            urgency += OpponentCanClaimColumnPrizeSoon(column) ? 100 : 60;
+        if (column >= 0 && column < ColumnCount - 1 && OpponentCanClaimColumnPrizeSoon(column))
+            urgency += 80;
+
+        return urgency;
+    }
+
     // После третьего броска ИИ может принудительно записать школу,
     // если нет более ценной готовой комбинации и ровно три кости нужного номинала уже собраны.
     private int GetForcedSchoolMove()
@@ -419,12 +256,8 @@ public partial class MainWindow
         if (_rollCount < 3)
             return -1;
 
-        var counts = GetDiceCounts();
-        if (HasValuableFinishedCombination(counts))
-            return -1;
-
-        return counts
-            .Where(pair => pair.Value == 3 && CurrentPlayer.GetFreeCell(pair.Key - 1) != -1)
+        return GetDiceCounts()
+            .Where(pair => pair.Value >= 3 && CurrentPlayer.GetFreeCell(pair.Key - 1) != -1)
             .OrderByDescending(pair => pair.Key)
             .Select(pair => pair.Key - 1)
             .FirstOrDefault(-1);
@@ -458,11 +291,196 @@ public partial class MainWindow
         if (_rollCount < 3 || CurrentPlayer.GetFreeCell(6) == -1)
             return -1;
 
+        if (HasBetterFinishedMoveThanWeakTwoPairs())
+            return -1;
+
         var twoPairsScore = CalculateScore(7);
         if (twoPairsScore is <= 0 or >= 18 || IsTacticalPrizeMove(7))
             return -1;
 
         return CalculateScore(6) > 0 ? 6 : -1;
+    }
+
+    private int PairScore(Dictionary<int, int> counts)
+    {
+        return counts
+            .Where(pair => pair.Value >= 2)
+            .Select(pair => pair.Key * 2)
+            .DefaultIfEmpty(0)
+            .Max();
+    }
+
+    private int GetKareValue(Dictionary<int, int> counts)
+    {
+        return counts
+            .Where(pair => pair.Value >= 4)
+            .Select(pair => pair.Key)
+            .DefaultIfEmpty(0)
+            .Max();
+    }
+
+    private bool IsKareWorthRecording(Dictionary<int, int> counts)
+    {
+        var value = GetKareValue(counts);
+        if (value == 0 || CurrentPlayer.GetFreeCell(12) == -1)
+            return false;
+
+        if (_rollCount == 1)
+            return true;
+
+        if (value >= 5)
+            return true;
+
+        var kareRowFill = CountBusyMainCellsInRow(12);
+        if (_rollCount >= 3 && value >= 3 && CurrentPlayer.GetFreeCell(value - 1) == -1 && kareRowFill <= 2)
+            return true;
+
+        var kareRowIsAlreadyUsed = kareRowFill >= 2;
+        if (CurrentPlayer.School <= 6 || kareRowIsAlreadyUsed)
+            return false;
+
+        return value == 4 && IsTacticalPrizeMove(12);
+    }
+
+    private bool IsFullHouseWorthRecording(Dictionary<int, int> counts)
+    {
+        var score = FullHouseScore(counts);
+        if (score == 0 || CurrentPlayer.GetFreeCell(9) == -1)
+            return false;
+
+        if (_rollCount == 1)
+            return true;
+
+        if (IsTacticalPrizeMove(9))
+            return true;
+
+        if (score >= 22)
+            return true;
+
+        var fullRowIsAlreadyUsed = CountBusyMainCellsInRow(9) >= 2;
+        if (CurrentPlayer.School <= 6 || fullRowIsAlreadyUsed)
+            return false;
+
+        return false;
+    }
+
+    private bool ShouldTakeOpeningPair()
+    {
+        return _rollCount == 1
+            && CountBusyMainCellsInRow(6) == 0
+            && ShouldPreferCombinationsOverSchool();
+    }
+
+    private int GetForcedTripleMove()
+    {
+        if (CurrentPlayer.GetFreeCell(8) == -1 || !GetDiceCounts().Any(pair => pair.Value >= 3))
+            return -1;
+
+        var hasStrongerSameDiceMove =
+            CurrentPlayer.GetFreeCell(13) != -1 && CalculateScore(13) > 0
+            || CurrentPlayer.GetFreeCell(12) != -1 && CalculateScore(12) > 0
+            || CurrentPlayer.GetFreeCell(9) != -1 && CalculateScore(9) > 0;
+
+        return hasStrongerSameDiceMove ? -1 : 8;
+    }
+
+    private int GetForcedWeakResultCrossOutMove()
+    {
+        if (_rollCount < 3 || !HasManyFreeCombinationCells())
+            return -1;
+
+        var pairScore = CurrentPlayer.GetFreeCell(6) != -1 && !IsTacticalPrizeMove(6)
+            ? CalculateScore(6)
+            : 0;
+        var twoPairsScore = CurrentPlayer.GetFreeCell(7) != -1 && !IsTacticalPrizeMove(7)
+            ? CalculateScore(7)
+            : 0;
+
+        var hasOnlyWeakPairResult = pairScore is > 0 and <= 8;
+        var hasOnlyWeakTwoPairsResult = twoPairsScore is > 0 and < 18;
+        if (!hasOnlyWeakPairResult && !hasOnlyWeakTwoPairsResult)
+            return -1;
+
+        return GetSacrificialCrossOutRow();
+    }
+
+    private bool HasManyFreeCombinationCells()
+    {
+        var freeCells = 0;
+        for (var row = 6; row < RowCount - 1; row++)
+        {
+            for (var column = 0; column < ColumnCount - 1; column++)
+            {
+                if (CurrentPlayer.Table[row, column] == EmptyCell)
+                    freeCells++;
+            }
+        }
+
+        return freeCells >= 20;
+    }
+
+    private int GetSacrificialCrossOutRow()
+    {
+        return new[] { 13, 11, 10 }
+            .Select((row, index) => new
+            {
+                Row = row,
+                Order = index,
+                Column = CurrentPlayer.GetFreeCell(row),
+                RowCrosses = CountCrossesInMainRow(row)
+            })
+            .Where(item => item.Column >= 0 && item.Column < ColumnCount - 2 && CalculateScore(item.Row) == 0)
+            .Select(item => new
+            {
+                item.Row,
+                Priority = CountCrossesInMainColumn(item.Column) * 40
+                    - item.RowCrosses * 24
+                    - item.Order
+            })
+            .OrderByDescending(item => item.Priority)
+            .Select(item => item.Row)
+            .FirstOrDefault(-1);
+    }
+
+    private int GetBalancedReadySchoolMove(Dictionary<int, int> counts)
+    {
+        if (_rollCount < 3)
+            return -1;
+
+        var readySchoolRows = counts
+            .Where(pair => pair.Value >= 3 && CurrentPlayer.GetFreeCell(pair.Key - 1) != -1)
+            .OrderByDescending(pair => pair.Value)
+            .ThenByDescending(pair => pair.Key)
+            .Select(pair => pair.Key - 1)
+            .ToArray();
+
+        if (readySchoolRows.Length == 0 || !ShouldPreferSchoolByTableBalance())
+            return -1;
+
+        return readySchoolRows[0];
+    }
+
+    private bool ShouldPreferSchoolByTableBalance()
+    {
+        const double schoolCapacity = 6.0 * (ColumnCount - 1);
+        const double combinationCapacity = (RowCount - 7.0) * (ColumnCount - 1);
+
+        var schoolFill = CountBusyMainCells(0, 6) / schoolCapacity;
+        var combinationFill = CountBusyMainCells(6, RowCount - 1) / combinationCapacity;
+
+        return CurrentPlayer.School <= 0 && schoolFill <= combinationFill + 0.08
+            || schoolFill + 0.12 < combinationFill;
+    }
+
+    private bool HasBetterFinishedMoveThanWeakTwoPairs()
+    {
+        var counts = GetDiceCounts();
+
+        return CurrentPlayer.GetFreeCell(13) != -1 && counts.Any(pair => pair.Value == 5)
+            || CurrentPlayer.GetFreeCell(12) != -1 && counts.Any(pair => pair.Value >= 4)
+            || CurrentPlayer.GetFreeCell(9) != -1 && IsFullHouseWorthRecording(counts)
+            || CurrentPlayer.GetFreeCell(8) != -1 && counts.Any(pair => pair.Value >= 3)
+            || Enumerable.Range(0, 6).Any(row => CurrentPlayer.GetFreeCell(row) != -1 && CountDice(row + 1) >= 3);
     }
 
     // Ищет лучшую слабую комбинацию, чтобы сравнить ее с мягким списанием школы.
@@ -495,7 +513,7 @@ public partial class MainWindow
             return true;
         if (CurrentPlayer.GetFreeCell(12) != -1 && counts.Any(pair => pair.Value >= 4))
             return true;
-        if (CurrentPlayer.GetFreeCell(9) != -1 && FullHouseScore(counts) > 0)
+        if (CurrentPlayer.GetFreeCell(9) != -1 && IsFullHouseWorthRecording(counts))
             return true;
         if (CurrentPlayer.GetFreeCell(7) != -1 && TwoPairsScore(counts) > 0)
             return true;
@@ -516,9 +534,14 @@ public partial class MainWindow
             || pairValues.Contains(5) && pairValues.Contains(4);
     }
 
+    private static bool IsStrongOpeningTriple(Dictionary<int, int> counts)
+    {
+        return counts.Any(pair => pair.Value >= 3 && pair.Key >= 5);
+    }
+
     private bool IsGoodOpeningSum()
     {
-        return _rollCount == 1 && _dice.Sum() >= 24;
+        return _rollCount == 1 && _dice.Sum() >= 23;
     }
 
     // Хорошая сумма с раздачи может быть выгоднее слабой пары/тройки.
@@ -531,7 +554,7 @@ public partial class MainWindow
         var hasStrongReadyCombination =
             CurrentPlayer.GetFreeCell(13) != -1 && counts.Any(pair => pair.Value == 5)
             || CurrentPlayer.GetFreeCell(12) != -1 && counts.Any(pair => pair.Value >= 4)
-            || CurrentPlayer.GetFreeCell(9) != -1 && FullHouseScore(counts) > 0
+            || CurrentPlayer.GetFreeCell(9) != -1 && IsFullHouseWorthRecording(counts)
             || CurrentPlayer.GetFreeCell(11) != -1 && CalculateScore(11) > 0
             || CurrentPlayer.GetFreeCell(10) != -1 && CalculateScore(10) > 0;
 
@@ -629,6 +652,9 @@ public partial class MainWindow
         if (!HasFreeCombinationMainCell() && TryKeepOnlyOpenSchoolDice())
             return;
 
+        if (TryKeepEndgameTargetDice())
+            return;
+
         // Если строка или столбец почти закрывают приз, сначала пытаемся удерживать кости под этот срочный ряд.
         var urgentTargetRow = GetUrgentComputerTargetRow();
         if (urgentTargetRow >= 0 && ApplyComputerTargetKeepStrategy(urgentTargetRow, counts))
@@ -695,7 +721,8 @@ public partial class MainWindow
             if (!ShouldChaseSchoolValue(value, count, preferCombinations) || CurrentPlayer.GetFreeCell(row) == -1)
                 continue;
 
-            var priority = count * 12 + value;
+            var rowFill = CountBusyMainCellsInRow(row);
+            var priority = count * 12 + value + Math.Max(0, 4 - rowFill) * 10 + GetSchoolPrizeRaceBonus(row);
             if (CurrentPlayer.Difficulty == ComputerDifficulty.Careful)
                 priority += value >= 5 ? 5 : 0;
 
@@ -738,10 +765,99 @@ public partial class MainWindow
         return true;
     }
 
+    private bool TryKeepEndgameTargetDice()
+    {
+        if (CountFreeMainCells() > 4)
+            return false;
+
+        var bestStraightValues = GetBestEndgameStraightValues();
+        var schoolValue = GetBestOpenSchoolValue();
+        if (bestStraightValues.Count > 0)
+        {
+            var straightKept = bestStraightValues.Count(value => _dice.Contains(value));
+            var schoolKept = schoolValue > 0 ? CountDice(schoolValue) : 0;
+            if (straightKept >= Math.Max(3, schoolKept + 1))
+            {
+                KeepSingleDiceForValues(bestStraightValues);
+                return true;
+            }
+        }
+
+        if (schoolValue > 0)
+        {
+            for (var i = 0; i < DiceCount; i++)
+                _fixedDice[i] = _dice[i] == schoolValue;
+            return true;
+        }
+
+        if (bestStraightValues.Count > 0)
+        {
+            KeepSingleDiceForValues(bestStraightValues);
+            return true;
+        }
+
+        return false;
+    }
+
+    private int CountFreeMainCells()
+    {
+        var count = 0;
+        for (var row = 0; row < RowCount - 1; row++)
+        {
+            for (var column = 0; column < ColumnCount - 1; column++)
+            {
+                if (CurrentPlayer.Table[row, column] == EmptyCell)
+                    count++;
+            }
+        }
+
+        return count;
+    }
+
+    private HashSet<int> GetBestEndgameStraightValues()
+    {
+        var candidates = new[]
+        {
+            (Row: 10, Values: Enumerable.Range(1, 5).ToHashSet()),
+            (Row: 11, Values: Enumerable.Range(2, 5).ToHashSet())
+        };
+
+        return candidates
+            .Where(candidate => CurrentPlayer.GetFreeCell(candidate.Row) != -1)
+            .Select(candidate => new
+            {
+                candidate.Values,
+                Present = candidate.Values.Count(value => _dice.Contains(value))
+            })
+            .Where(candidate => candidate.Present >= 3)
+            .OrderByDescending(candidate => candidate.Present)
+            .Select(candidate => candidate.Values)
+            .FirstOrDefault() ?? [];
+    }
+
+    private int GetBestOpenSchoolValue()
+    {
+        return Enumerable.Range(1, 6)
+            .Where(value => CurrentPlayer.GetFreeCell(value - 1) != -1)
+            .OrderByDescending(CountDice)
+            .ThenByDescending(value => value)
+            .FirstOrDefault();
+    }
+
+    private void KeepSingleDiceForValues(HashSet<int> values)
+    {
+        var kept = new HashSet<int>();
+        for (var i = 0; i < DiceCount; i++)
+        {
+            var value = _dice[i];
+            _fixedDice[i] = values.Contains(value) && kept.Add(value);
+        }
+    }
+
     // Ищет строку, где текущий ход может закрыть свой приз или помешать ближайшему призу соперника.
     private int GetUrgentComputerTargetRow()
     {
-        for (var row = 6; row < RowCount - 1; row++)
+        for (var row = 0; row < RowCount - 1; row++)
         {
             var column = CurrentPlayer.GetFreeCell(row);
             if (column == -1)
@@ -768,6 +884,9 @@ public partial class MainWindow
     {
         switch (row)
         {
+            case >= 0 and < 6:
+                KeepValues([row + 1]);
+                return true;
             case 6:
                 return KeepPairs(counts, 1);
             case 7:
@@ -847,8 +966,8 @@ public partial class MainWindow
         if (counts.Any(item => item.Count >= 2))
             return false;
 
-        return CurrentPlayer.GetFreeCell(10) != -1 && smallStraight >= straightTarget
-            || CurrentPlayer.GetFreeCell(11) != -1 && bigStraight >= straightTarget;
+        return CurrentPlayer.GetFreeCell(10) != -1 && smallStraight >= straightTarget && IsTacticalPrizeMove(10)
+            || CurrentPlayer.GetFreeCell(11) != -1 && bigStraight >= straightTarget && IsTacticalPrizeMove(11);
     }
 
     private HashSet<int> GetStraightKeepValues(int smallStraight, int bigStraight)
@@ -889,8 +1008,11 @@ public partial class MainWindow
     // При перекосе в школу компьютер переключается на комбинации, кроме очень сильных школьных номиналов.
     private bool ShouldChaseSchoolValue(int value, int count, bool preferCombinations)
     {
+        if (IsSchoolPrizeRaceTarget(value - 1))
+            return true;
+
         if (count >= 3)
-            return !preferCombinations || value >= 5;
+            return CurrentPlayer.School <= 0 || !preferCombinations || value >= 5;
 
         if (count < 2)
             return false;
@@ -902,6 +1024,27 @@ public partial class MainWindow
             return value >= 5 && CurrentPlayer.Difficulty == ComputerDifficulty.Careful;
 
         return true;
+    }
+
+    private int GetSchoolPrizeRaceBonus(int row)
+    {
+        if (!IsSchoolPrizeRaceTarget(row))
+            return 0;
+
+        var rowFill = CountBusyMainCellsInRow(row);
+        return 70 + rowFill * 18;
+    }
+
+    private bool IsSchoolPrizeRaceTarget(int row)
+    {
+        if (row is < 0 or >= 6 || CurrentPlayer.GetFreeCell(row) == -1)
+            return false;
+        if (CurrentPlayer.Table[row, ColumnCount - 1] != EmptyCell)
+            return false;
+
+        var rowFill = CountBusyMainCellsInRow(row);
+        return rowFill >= 3 && OpponentPrizeIsOpen(row, ColumnCount - 1)
+            || OpponentCanClaimRowPrizeSoon(row);
     }
 
     private readonly record struct ComputerMove(int Row, int Score, int AdjustedScore);
