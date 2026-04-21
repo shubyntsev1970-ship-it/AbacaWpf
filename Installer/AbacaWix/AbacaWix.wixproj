@@ -1,7 +1,7 @@
 <Project Sdk="WixToolset.Sdk/5.0.2">
 
   <PropertyGroup>
-    <OutputName>Abaca_WiX_Setup</OutputName>
+    <OutputName>Abaca_Setup</OutputName>
     <OutputType>Package</OutputType>
     <Platform>x64</Platform>
     <AbacaPublishDir>$(MSBuildThisFileDirectory)..\..\bin\Release\AbacaPublish</AbacaPublishDir>
@@ -22,7 +22,7 @@
 
   <Target Name="CopyMsiToDist" AfterTargets="Build" Condition="Exists('$(TargetPath)')">
     <MakeDir Directories="$(MSBuildThisFileDirectory)..\..\dist" />
-    <Copy SourceFiles="$(TargetPath)" DestinationFiles="$(MSBuildThisFileDirectory)..\..\dist\Abaca_WiX_Setup.msi" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFiles="$(MSBuildThisFileDirectory)..\..\dist\Abaca_Setup.msi" />
   </Target>
 
 </Project>

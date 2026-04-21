@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Media;
 using System.Windows;
 using System.Windows.Controls;
@@ -39,7 +39,7 @@ public partial class MainWindow : Window
     private int _lastMoveRow = -1;
     private readonly string[] _rowLabels =
     [
-        "1", "2", "3", "4", "5", "6", "пара", "пары", "тройка", "фул", "Мстр", "Бстр", "каре", "абак", "сумма", "приз"
+        "1", "2", "3", "4", "5", "6", "пара", "пары", "тройка", "фул", "м. стрит", "б. стрит", "каре", "абак", "сумма", "приз"
     ];
     private readonly string[] _rowHotkeys =
     [
@@ -403,6 +403,12 @@ public partial class MainWindow : Window
             return;
 
         var score = CalculateScore(row);
+        if (row < 6 && score < 0 && CountDice(row + 1) == 0 && HasFreeCombinationMainCell())
+        {
+            ShowLargeMessage("ABACA", "В школе нельзя вычеркивать строку без нужной кости, пока есть свободные клетки в комбинациях.");
+            return;
+        }
+
         if (row < 6 && score < 0 && -score > CurrentPlayer.School && !CurrentPlayer.IsOnlySchoolFree())
         {
             ShowLargeMessage("ABACA", "Недостаточно очков школы для такой записи. Выберите другую комбинацию.");
@@ -442,12 +448,17 @@ public partial class MainWindow : Window
 
     private static int TwoPairsScore(Dictionary<int, int> counts)
     {
-        var pairs = counts
+        var pairs = GetTwoPairValues(counts);
+        return pairs.Length == 2 ? pairs.Sum() * 2 : 0;
+    }
+
+    private static int[] GetTwoPairValues(Dictionary<int, int> counts)
+    {
+        return counts
             .SelectMany(pair => Enumerable.Repeat(pair.Key, pair.Value / 2))
             .OrderByDescending(value => value)
             .Take(2)
             .ToArray();
-        return pairs.Length == 2 ? pairs.Sum() * 2 : 0;
     }
 
     private static int FullHouseScore(Dictionary<int, int> counts)
@@ -753,8 +764,8 @@ public partial class MainWindow : Window
             7 => "Пары: две разные пары.",
             8 => "Три: три одинаковые кости.",
             9 => "Фул: три плюс пара; пять одинаковых тоже считаются фулом.",
-            10 => "Малая строка: 1-2-3-4-5.",
-            11 => "Большая строка: 2-3-4-5-6.",
+            10 => "Малый стрит: 1-2-3-4-5.",
+            11 => "Большой стрит: 2-3-4-5-6.",
             12 => "Каре: четыре одинаковые кости плюс 20.",
             13 => "Абак: пять одинаковых костей плюс 50.",
             14 => "Сумма всех костей.",
@@ -778,11 +789,12 @@ public partial class MainWindow : Window
     {
         const string rules =
             "ABACA: правила игры\n\n" +
-            "Цель: набрать больше очков, чем соперник. Игроки ходят по очереди и записывают результат в первую свободную ячейку выбранной строки.\n\n" +
+            "Цель: набрать больше очков, чем соперник. Игроки ходят по очереди и записывают результат в первую свободную ячейку выбранной строки таблицы.\n\n" +
             "Ход: у игрока до трех бросков. Нажмите СТАРТ/СТОП или Space. После остановки можно кликом фиксировать нужные кубики; зафиксированные кубики не перебрасываются.\n\n" +
             "Школа 1-6: считается количество выбранного номинала. Три одинаковых дают 0; меньше трех записывает минус, больше трех - плюс. Отрицательная школа влияет на общий счет по старым правилам Abaca.\n\n" +
-            "Комбинации: пара, две пары, тройка, фул, малая строка 1-2-3-4-5, большая строка 2-3-4-5-6, каре, абак и сумма. Комбинация, собранная с первого броска, удваивается.\n\n" +
-            "Призы: заполненная строка дает приз. В школе приз равен номиналу строки x 5, в остальных строках - максимуму строки. Заполненная колонка дает максимум колонки. Приз соперника в той же строке или колонке вычеркивается (за исключением последней колонки).\n\n" +
+            "Очки в комбинациях: кроме школы, в клетку записывается сумма значений кубиков, которые составляют комбинацию. Для каре дополнительно добавляется 20 очков, для абака - 50 очков.\n\n" +
+            "Комбинации: пара, две пары, тройка, фул, малый стрит 1-2-3-4-5, большой стрит 2-3-4-5-6, каре, абак и сумма. Любая комбинация, кроме школы, собранная с первого броска, удваивается.\n\n" +
+            "Призы: заполненная строка таблицы дает приз. В школе приз равен номиналу строки x 5, в остальных строках таблицы - максимуму строки. Заполненная колонка дает максимум колонки. Приз соперника в той же строке таблицы или колонке вычеркивается (за исключением последней колонки).\n\n" +
             "Горячие клавиши:\n" +
             "  Space        - старт / стоп броска\n" +
             "  Left / Right - выбрать кубик слева / справа\n" +
@@ -799,8 +811,8 @@ public partial class MainWindow : Window
             "  D - пары\n" +
             "  T - тройка\n" +
             "  F - фул\n" +
-            "  E - малая строка\n" +
-            "  S - большая строка\n" +
+            "  E - малый стрит\n" +
+            "  S - большой стрит\n" +
             "  C - каре\n" +
             "  A - абак\n" +
             "  + - сумма";
@@ -1247,11 +1259,12 @@ public partial class MainWindow : Window
         if (_computerTurnInProgress || CurrentPlayer.IsComputer)
             return;
 
-        if (_isRolling && e.Key != Key.Space)
+        var key = GetShortcutKey(e);
+        if (_isRolling && key != Key.Space)
             return;
 
         var handled = true;
-        switch (e.Key)
+        switch (key)
         {
             case Key.Space:
                 ToggleRoll();
@@ -1322,6 +1335,17 @@ public partial class MainWindow : Window
         e.Handled = handled;
     }
 
+    private static Key GetShortcutKey(KeyEventArgs e)
+    {
+        if (e.Key == Key.System)
+            return e.SystemKey;
+
+        if (e.Key == Key.ImeProcessed)
+            return e.ImeProcessedKey;
+
+        return e.Key;
+    }
+
     private void SetSelectedFixed(bool isFixed)
     {
         var index = Array.FindIndex(_selectedDice, selected => selected);
@@ -1358,6 +1382,7 @@ public partial class MainWindow : Window
                 var best = GetBestComputerMove();
                 if (_rollCount >= 3 || ShouldComputerStop(best))
                 {
+                    await Task.Delay(2000);
                     _computerTurnInProgress = false;
                     ScoreCombination(best.Row, true);
                     scored = true;
@@ -1370,6 +1395,7 @@ public partial class MainWindow : Window
 
                 if (_fixedDice.All(fixedDie => fixedDie))
                 {
+                    await Task.Delay(2000);
                     _computerTurnInProgress = false;
                     ScoreCombination(best.Row, true);
                     scored = true;
@@ -1387,6 +1413,7 @@ public partial class MainWindow : Window
                 if (_isRolling)
                     StopRolling();
                 var best = GetBestComputerMove();
+                await Task.Delay(2000);
                 _computerTurnInProgress = false;
                 ScoreCombination(best.Row, true);
                 scored = true;
@@ -1398,104 +1425,6 @@ public partial class MainWindow : Window
                 _computerTurnInProgress = false;
             UpdateInputState();
         }
-    }
-
-    private bool ShouldComputerStop((int Row, int Score) best)
-    {
-        var threshold = CurrentPlayer.Difficulty switch
-        {
-            ComputerDifficulty.Careful => 20,
-            ComputerDifficulty.Aggressive => 42,
-            _ => 32
-        };
-
-        if (best.Row == 13 || best.Row == 12 && best.Score > 0)
-            return true;
-
-        return best.Score >= threshold;
-    }
-
-    private (int Row, int Score) GetBestComputerMove()
-    {
-        var bestRow = -1;
-        var bestScore = int.MinValue;
-
-        for (var row = 0; row < RowCount - 1; row++)
-        {
-            if (CurrentPlayer.GetFreeCell(row) == -1)
-                continue;
-
-            var score = CalculateScore(row);
-            if (row < 6 && score < 0 && -score > CurrentPlayer.School && !CurrentPlayer.IsOnlySchoolFree())
-                continue;
-
-            var adjusted = score + GetDifficultyRowBonus(row, score);
-            if (row >= 6 && score == 0)
-                adjusted -= CurrentPlayer.Difficulty == ComputerDifficulty.Aggressive ? 4 : 12;
-            if (row < 6 && score < 0)
-                adjusted -= CurrentPlayer.Difficulty == ComputerDifficulty.Careful ? 18 : 8;
-
-            if (adjusted > bestScore)
-            {
-                bestScore = adjusted;
-                bestRow = row;
-            }
-        }
-
-        if (bestRow == -1)
-            bestRow = Enumerable.Range(0, RowCount - 1).First(row => CurrentPlayer.GetFreeCell(row) != -1);
-
-        return (bestRow, CalculateScore(bestRow));
-    }
-
-    private int GetDifficultyRowBonus(int row, int score)
-    {
-        return CurrentPlayer.Difficulty switch
-        {
-            ComputerDifficulty.Careful when row < 6 && score >= 0 => 7,
-            ComputerDifficulty.Careful when row == 14 => 4,
-            ComputerDifficulty.Aggressive when row is >= 10 and <= 13 => 12,
-            ComputerDifficulty.Aggressive when row >= 6 && score > 0 => 5,
-            _ => 0
-        };
-    }
-
-    private void ApplyComputerKeepStrategy()
-    {
-        Array.Fill(_fixedDice, false);
-        Array.Fill(_selectedDice, false);
-
-        var counts = Enumerable.Range(1, 6)
-            .Select(value => new { Value = value, Count = _dice.Count(die => die == value) })
-            .OrderByDescending(item => item.Count)
-            .ThenByDescending(item => item.Value)
-            .ToArray();
-
-        if (CurrentPlayer.Difficulty == ComputerDifficulty.Careful)
-        {
-            var pairValue = counts.FirstOrDefault(item => item.Count >= 2)?.Value ?? counts[0].Value;
-            for (var i = 0; i < DiceCount; i++)
-                _fixedDice[i] = _dice[i] == pairValue || (_rollCount >= 2 && _dice[i] >= 5);
-            return;
-        }
-
-        var smallStraight = Enumerable.Range(1, 5).Count(value => _dice.Contains(value));
-        var bigStraight = Enumerable.Range(2, 5).Count(value => _dice.Contains(value));
-        var straightTarget = CurrentPlayer.Difficulty == ComputerDifficulty.Aggressive ? 3 : 4;
-        if (smallStraight >= straightTarget || bigStraight >= straightTarget)
-        {
-            var straightValues = smallStraight >= bigStraight ? Enumerable.Range(1, 5).ToHashSet() : Enumerable.Range(2, 5).ToHashSet();
-            for (var i = 0; i < DiceCount; i++)
-                _fixedDice[i] = straightValues.Contains(_dice[i]);
-            return;
-        }
-
-        var keepValue = counts[0].Value;
-        if (CurrentPlayer.Difficulty == ComputerDifficulty.Aggressive && counts[0].Count < 3)
-            keepValue = counts.OrderByDescending(item => item.Value).First().Value;
-
-        for (var i = 0; i < DiceCount; i++)
-            _fixedDice[i] = _dice[i] == keepValue;
     }
 
     // Player state and helpers for occupied rows/columns.
@@ -1554,7 +1483,7 @@ public partial class MainWindow : Window
 
         public int GetFreeCell(int row)
         {
-            for (var column = 0; column < ColumnCount; column++)
+            for (var column = 0; column < ColumnCount - 1; column++)
             {
                 if (Table[row, column] == EmptyCell)
                     return column;

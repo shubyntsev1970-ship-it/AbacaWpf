@@ -11,6 +11,7 @@
     <MajorUpgrade DowngradeErrorMessage="A newer version of Abaca is already installed." />
     <MediaTemplate EmbedCab="yes" />
     <Icon Id="Abaca.ico" SourceFile="..\..\Assets\AppIcon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="Abaca.ico" />
 
     <StandardDirectory Id="LocalAppDataFolder">
       <Directory Id="ProgramsRootFolder" Name="Programs">
@@ -28,6 +29,14 @@
         <Shortcut
           Id="ApplicationStartMenuShortcut"
           Directory="ApplicationProgramsFolder"
+          Name="Abaca"
+          Description="Launch Abaca"
+          Target="[INSTALLFOLDER]Abaca.exe"
+          WorkingDirectory="INSTALLFOLDER"
+          Icon="Abaca.ico" />
+        <Shortcut
+          Id="ApplicationDesktopShortcut"
+          Directory="DesktopFolder"
           Name="Abaca"
           Description="Launch Abaca"
           Target="[INSTALLFOLDER]Abaca.exe"
