@@ -14,6 +14,7 @@ namespace AbacaWpf;
 
 public partial class MainWindow : Window
 {
+    private const string AppVersion = "0.9.1-test";
     private const double TableLineThickness = 2.5;
 
     // Board geometry and table markers.
@@ -55,6 +56,8 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        Title = $"Abaca {AppVersion}";
+        VersionText.Text = AppVersion;
         _rollTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(90) };
         _rollTimer.Tick += RollTimer_Tick;
         BuildTables();
@@ -390,7 +393,7 @@ public partial class MainWindow : Window
     }
 
     // Combination validation, scoring rules, and prize resolution.
-    private void ScoreCombination(int row, bool fromComputer = false)
+    private async void ScoreCombination(int row, bool fromComputer = false)
     {
         if (_computerTurnInProgress && !fromComputer)
             return;
@@ -422,8 +425,15 @@ public partial class MainWindow : Window
         }
 
         WriteTable(row, column, score);
-        if (!IsGameOver())
-            StartNextTurn();
+        if (IsGameOver())
+            return;
+
+        // Test pause for AI analysis: after the computer writes to the table,
+        // keep the final dice and highlighted cell visible for screenshots.
+        if (fromComputer)
+            await Task.Delay(3000);
+
+        StartNextTurn();
     }
 
     private void WriteTable(int row, int column, int score)
@@ -1421,7 +1431,6 @@ public partial class MainWindow : Window
                 var best = GetBestComputerMove();
                 if (_rollCount >= 3 || ShouldComputerStop(best))
                 {
-                    await Task.Delay(2000);
                     _computerTurnInProgress = false;
                     ScoreCombination(best.Row, true);
                     scored = true;
@@ -1434,7 +1443,6 @@ public partial class MainWindow : Window
 
                 if (_fixedDice.All(fixedDie => fixedDie))
                 {
-                    await Task.Delay(2000);
                     _computerTurnInProgress = false;
                     ScoreCombination(best.Row, true);
                     scored = true;
@@ -1452,7 +1460,6 @@ public partial class MainWindow : Window
                 if (_isRolling)
                     StopRolling();
                 var best = GetBestComputerMove();
-                await Task.Delay(2000);
                 _computerTurnInProgress = false;
                 ScoreCombination(best.Row, true);
                 scored = true;

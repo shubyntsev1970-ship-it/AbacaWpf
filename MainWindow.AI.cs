@@ -17,9 +17,6 @@ public partial class MainWindow
         if (best.Score <= 0)
             return false;
 
-        if (CurrentPlayer.Difficulty == ComputerDifficulty.Aggressive && IsTacticalPrizeMove(best.Row))
-            return true;
-
         if (best.Row == 14 && _rollCount == 1 && IsGoodOpeningSum())
             return true;
 
@@ -170,10 +167,6 @@ public partial class MainWindow
 
         if (CurrentPlayer.GetFreeCell(9) != -1 && IsFullHouseWorthRecording(counts))
             return 9;
-
-        var aggressivePrizeRaceRow = GetAggressiveOpeningPrizeRaceMove(counts);
-        if (aggressivePrizeRaceRow >= 0)
-            return aggressivePrizeRaceRow;
 
         if (CurrentPlayer.GetFreeCell(7) != -1 && TwoPairsScore(counts) > 0 && IsTacticalPrizeMove(7))
             return 7;
