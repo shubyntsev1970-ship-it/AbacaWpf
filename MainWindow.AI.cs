@@ -79,6 +79,10 @@ public partial class MainWindow
         if (forcedTripleRow >= 0)
             return new ComputerMove(forcedTripleRow, CalculateScore(forcedTripleRow), int.MaxValue);
 
+        var forcedUsefulPairRow = GetForcedUsefulPairMove();
+        if (forcedUsefulPairRow >= 0)
+            return new ComputerMove(forcedUsefulPairRow, CalculateScore(forcedUsefulPairRow), int.MaxValue);
+
         var forcedWeakResultCrossOutRow = GetForcedWeakResultCrossOutMove();
         if (forcedWeakResultCrossOutRow >= 0)
             return new ComputerMove(forcedWeakResultCrossOutRow, CalculateScore(forcedWeakResultCrossOutRow), int.MaxValue);
@@ -388,6 +392,18 @@ public partial class MainWindow
         return hasStrongerSameDiceMove ? -1 : 8;
     }
 
+    private int GetForcedUsefulPairMove()
+    {
+        if (_rollCount < 3 || CurrentPlayer.GetFreeCell(6) == -1)
+            return -1;
+
+        var pairScore = CalculateScore(6);
+        if (pairScore < 6 || HasBetterFinishedMoveThanWeakTwoPairs())
+            return -1;
+
+        return 6;
+    }
+
     private int GetForcedWeakResultCrossOutMove()
     {
         if (_rollCount < 3 || !HasManyFreeCombinationCells())
@@ -683,6 +699,9 @@ public partial class MainWindow
             return;
         }
 
+        if (TryKeepUsefulPairDice(counts))
+            return;
+
         // Обычная школьная стратегия: держим номинал школы только когда он действительно открыт и полезен.
         var schoolTarget = GetComputerSchoolTarget(counts);
         if (schoolTarget > 0)
@@ -697,7 +716,7 @@ public partial class MainWindow
             var pair = counts.FirstOrDefault(item => item.Count >= 2);
             var pairValue = pair.Count >= 2 ? pair.Value : counts[0].Value;
             for (var i = 0; i < DiceCount; i++)
-                _fixedDice[i] = _dice[i] == pairValue || (_rollCount >= 2 && _dice[i] >= 5);
+                _fixedDice[i] = _dice[i] == pairValue || (pair.Count < 2 && _rollCount >= 2 && _dice[i] >= 5);
             return;
         }
 
@@ -889,6 +908,9 @@ public partial class MainWindow
         switch (row)
         {
             case >= 0 and < 6:
+                if (CountDice(row + 1) < 2 && HasUsefulPairTarget(counts))
+                    return false;
+
                 KeepValues([row + 1]);
                 return true;
             case 6:
@@ -913,6 +935,32 @@ public partial class MainWindow
             default:
                 return false;
         }
+    }
+
+    private bool TryKeepUsefulPairDice((int Value, int Count)[] counts)
+    {
+        var pair = counts.FirstOrDefault(item => item.Count >= 2 && item.Value >= 2 && HasPairDevelopmentTarget(item.Value));
+        if (pair.Count < 2)
+            return false;
+
+        KeepValues([pair.Value]);
+        return true;
+    }
+
+    private bool HasUsefulPairTarget((int Value, int Count)[] counts)
+    {
+        return counts.Any(item => item.Count >= 2 && item.Value >= 2 && HasPairDevelopmentTarget(item.Value));
+    }
+
+    private bool HasPairDevelopmentTarget(int value)
+    {
+        return CurrentPlayer.GetFreeCell(value - 1) != -1
+            || CurrentPlayer.GetFreeCell(6) != -1
+            || CurrentPlayer.GetFreeCell(7) != -1
+            || CurrentPlayer.GetFreeCell(8) != -1
+            || CurrentPlayer.GetFreeCell(9) != -1
+            || CurrentPlayer.GetFreeCell(12) != -1
+            || CurrentPlayer.GetFreeCell(13) != -1;
     }
 
     private bool KeepPairs((int Value, int Count)[] counts, int pairCount)

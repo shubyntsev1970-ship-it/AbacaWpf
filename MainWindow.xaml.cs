@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Media;
 using System.Windows;
 using System.Windows.Controls;
@@ -14,7 +14,7 @@ namespace AbacaWpf;
 
 public partial class MainWindow : Window
 {
-    private const string AppVersion = "0.9.4-test";
+    private const string AppVersion = "0.9.6-test";
     private const double TableLineThickness = 2.5;
 
     // Board geometry and table markers.
