@@ -14,7 +14,7 @@ namespace AbacaWpf;
 
 public partial class MainWindow : Window
 {
-    private const string AppVersion = "0.9.1-test";
+    private const string AppVersion = "0.9.2-test";
     private const double TableLineThickness = 2.5;
 
     // Board geometry and table markers.

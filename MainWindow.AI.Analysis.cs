@@ -160,7 +160,7 @@ public partial class MainWindow
         if (row > 2 || score >= 0)
             return false;
 
-        return CurrentPlayer.School >= 6 && -score <= 3 && -score <= CurrentPlayer.School / 2;
+        return CurrentPlayer.School > 0 && -score <= 3 && -score <= CurrentPlayer.School;
     }
 
     private bool ShouldPreferCombinationsOverSchool()

@@ -260,11 +260,11 @@ public partial class MainWindow
     // маленький допустимый минус в школе может быть лучше, чем тратить важную строку комбинаций.
     private int GetForcedLowCostSchoolMove()
     {
-        if (_rollCount < 3 || CurrentPlayer.School < 6)
+        if (_rollCount < 3 || CurrentPlayer.School <= 0)
             return -1;
 
         var bestWeakCombination = GetBestWeakCombinationMove();
-        if (bestWeakCombination.Row == -1 || bestWeakCombination.Score > 10 || IsTacticalPrizeMove(bestWeakCombination.Row))
+        if (bestWeakCombination.Row == -1 || bestWeakCombination.Score > 14 || IsTacticalPrizeMove(bestWeakCombination.Row))
             return -1;
 
         return Enumerable.Range(0, 3)
@@ -277,7 +277,7 @@ public partial class MainWindow
             .FirstOrDefault(-1);
     }
 
-    // Для слабых двух пар меньше 18 очков ИИ сначала пробует школу,
+    // Для слабых двух пар до 18 очков ИИ сначала пробует школу,
     // а если школа недоступна, выбирает пару, чтобы сохранить строку "две пары" для более сильного хода.
     private int GetForcedWeakPairMove()
     {
@@ -288,10 +288,18 @@ public partial class MainWindow
             return -1;
 
         var twoPairsScore = CalculateScore(7);
-        if (twoPairsScore is <= 0 or >= 18 || IsTacticalPrizeMove(7))
+        if (twoPairsScore <= 0 || IsTacticalPrizeMove(7))
+            return -1;
+
+        if (twoPairsScore > 18 || twoPairsScore == 18 && !ShouldPreferPairOverMediumTwoPairs())
             return -1;
 
         return CalculateScore(6) > 0 ? 6 : -1;
+    }
+
+    private bool ShouldPreferPairOverMediumTwoPairs()
+    {
+        return CountBusyMainCellsInRow(6) == 0 && CountBusyMainCellsInRow(7) > 0;
     }
 
     private int PairScore(Dictionary<int, int> counts)
