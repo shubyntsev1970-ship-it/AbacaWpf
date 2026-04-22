@@ -1,4 +1,4 @@
-﻿namespace AbacaWpf;
+namespace AbacaWpf;
 
 public partial class MainWindow
 {
@@ -67,13 +67,13 @@ public partial class MainWindow
         if (forcedTacticalPrizeRow >= 0)
             return new ComputerMove(forcedTacticalPrizeRow, CalculateScore(forcedTacticalPrizeRow), int.MaxValue);
 
-        var forcedLowCostSchoolRow = GetForcedLowCostSchoolMove();
-        if (forcedLowCostSchoolRow >= 0)
-            return new ComputerMove(forcedLowCostSchoolRow, CalculateScore(forcedLowCostSchoolRow), int.MaxValue);
-
         var forcedSchoolRow = GetForcedSchoolMove();
         if (forcedSchoolRow >= 0)
             return new ComputerMove(forcedSchoolRow, CalculateScore(forcedSchoolRow), int.MaxValue);
+
+        var forcedLowCostSchoolRow = GetForcedLowCostSchoolMove();
+        if (forcedLowCostSchoolRow >= 0)
+            return new ComputerMove(forcedLowCostSchoolRow, CalculateScore(forcedLowCostSchoolRow), int.MaxValue);
 
         var forcedTripleRow = GetForcedTripleMove();
         if (forcedTripleRow >= 0)
@@ -171,14 +171,14 @@ public partial class MainWindow
         if (CurrentPlayer.GetFreeCell(7) != -1 && TwoPairsScore(counts) > 0 && IsTacticalPrizeMove(7))
             return 7;
 
+        if (CurrentPlayer.GetFreeCell(8) != -1 && counts.Any(pair => pair.Value >= 3))
+            return 8;
+
         if (CurrentPlayer.GetFreeCell(7) != -1 && TwoPairsScore(counts) >= 18)
             return 7;
 
         if (CurrentPlayer.GetFreeCell(6) != -1 && PairScore(counts) >= 10 && ShouldTakeOpeningPair())
             return 6;
-
-        if (CurrentPlayer.GetFreeCell(8) != -1 && counts.Any(pair => pair.Value >= 3))
-            return 8;
 
         if (ShouldTakeOpeningSum(counts))
             return 14;
@@ -333,6 +333,9 @@ public partial class MainWindow
             return true;
 
         var kareRowFill = CountBusyMainCellsInRow(12);
+        if (_rollCount >= 3 && value >= 4 && kareRowFill <= 1)
+            return true;
+
         if (_rollCount >= 3 && value >= 3 && CurrentPlayer.GetFreeCell(value - 1) == -1 && kareRowFill <= 2)
             return true;
 
