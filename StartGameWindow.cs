@@ -31,6 +31,14 @@ public sealed class StartGameWindow : Window
         IsEnabled = false,
         Margin = new Thickness(12, 8, 0, 0)
     };
+    private readonly CheckBox _aiTrainingLogBox = new()
+    {
+        Content = "AI training log",
+        Foreground = Brushes.White,
+        FontSize = 15,
+        IsEnabled = false,
+        Margin = new Thickness(0, 6, 0, 0)
+    };
     private readonly TextBlock _firstRollText = new() { Text = "0", FontSize = 36, FontWeight = FontWeights.Bold };
     private readonly TextBlock _secondRollText = new() { Text = "0", FontSize = 36, FontWeight = FontWeights.Bold };
     private readonly TextBlock _rollStatusText = new()
@@ -67,7 +75,7 @@ public sealed class StartGameWindow : Window
     private bool _computerStartRollInProgress;
 
     // Окно собирается кодом, потому что элементы меняют состояние во время стартовых бросков.
-    public StartGameWindow(Random random)
+    public StartGameWindow(Random random, bool aiTrainingLoggingEnabled = false)
     {
         _random = random;
         _rollTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(90) };
@@ -79,6 +87,7 @@ public sealed class StartGameWindow : Window
         ResizeMode = ResizeMode.NoResize;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = new SolidColorBrush(Color.FromRgb(16, 24, 32));
+        _aiTrainingLogBox.IsChecked = aiTrainingLoggingEnabled;
         Content = BuildContent();
         _firstNameBox.TextChanged += (_, _) => UpdateRollButtonText();
         _secondNameBox.TextChanged += (_, _) => UpdateRollButtonText();
@@ -102,6 +111,7 @@ public sealed class StartGameWindow : Window
     public string SecondPlayerName => PlayAgainstComputer ? "Компьютер" : _secondNameBox.Text.Trim();
     public bool SecondPlayerStarts => _secondRoll > _firstRoll;
     public bool PlayAgainstComputer => _computerModeBox.IsChecked == true;
+    public bool AiTrainingLoggingEnabled => PlayAgainstComputer && _aiTrainingLogBox.IsChecked == true;
     public ComputerDifficulty ComputerDifficulty => _difficultyBox.SelectedIndex switch
     {
         0 => ComputerDifficulty.Careful,
@@ -149,6 +159,7 @@ public sealed class StartGameWindow : Window
             _secondNameBox.Text = "Компьютер";
             _secondNameBox.IsEnabled = false;
             _difficultyBox.IsEnabled = true;
+            _aiTrainingLogBox.IsEnabled = true;
             UpdateRollButtonText();
             _firstNameBox.Focus();
             _firstNameBox.SelectAll();
@@ -158,11 +169,16 @@ public sealed class StartGameWindow : Window
             _secondNameBox.IsEnabled = true;
             _secondNameBox.Text = "";
             _difficultyBox.IsEnabled = false;
+            _aiTrainingLogBox.IsEnabled = false;
+            _aiTrainingLogBox.IsChecked = false;
             UpdateRollButtonText();
         };
-        var optionsPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        optionsPanel.Children.Add(_computerModeBox);
-        optionsPanel.Children.Add(_difficultyBox);
+        var optionsPanel = new StackPanel { Orientation = Orientation.Vertical, VerticalAlignment = VerticalAlignment.Center };
+        var computerOptionsPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        computerOptionsPanel.Children.Add(_computerModeBox);
+        computerOptionsPanel.Children.Add(_difficultyBox);
+        optionsPanel.Children.Add(computerOptionsPanel);
+        optionsPanel.Children.Add(_aiTrainingLogBox);
         Grid.SetRow(optionsPanel, 3);
         root.Children.Add(optionsPanel);
 
@@ -408,6 +424,7 @@ public sealed class StartGameWindow : Window
         _secondNameBox.IsEnabled = isEnabled && !PlayAgainstComputer;
         _computerModeBox.IsEnabled = isEnabled;
         _difficultyBox.IsEnabled = isEnabled && PlayAgainstComputer;
+        _aiTrainingLogBox.IsEnabled = isEnabled && PlayAgainstComputer;
     }
 
     private void UpdateRollingDice()

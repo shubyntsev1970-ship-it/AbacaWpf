@@ -1,4 +1,4 @@
-﻿namespace AbacaWpf;
+namespace AbacaWpf;
 
 public partial class MainWindow
 {
@@ -20,6 +20,8 @@ public partial class MainWindow
                 priority += 22 + value * 3;
                 if (count >= 3)
                     priority += 38 + value * 2;
+                if (score == 0 && count >= 3)
+                    priority += GetSchoolZeroBonus(row);
                 if (CurrentPlayer.Table[row, 0] == EmptyCell)
                     priority += 12;
             }
@@ -51,9 +53,9 @@ public partial class MainWindow
             priority -= 34;
 
         if (CompletesOwnRowPrize(row))
-            priority += OpponentCanClaimRowPrizeSoon(row) ? 72 : OpponentPrizeIsOpen(row, ColumnCount - 1) ? 34 : 16;
+            priority += ShouldBlockOpponentRowPrize(row) ? 72 : OpponentPrizeIsOpen(row, ColumnCount - 1) ? 34 : 16;
         if (column >= 0 && column < ColumnCount - 1 && CompletesOwnColumnPrize(column))
-            priority += OpponentCanClaimColumnPrizeSoon(column) ? 64 : OpponentPrizeIsOpen(RowCount - 1, column) ? 30 : 14;
+            priority += ShouldBlockOpponentColumnPrize(column) ? 64 : OpponentPrizeIsOpen(RowCount - 1, column) ? 30 : 14;
         if (column >= 0 && column < ColumnCount - 1)
             priority += GetTableFillBalanceBonus(row, column, score);
 
@@ -115,6 +117,25 @@ public partial class MainWindow
         };
     }
 
+    // Школьный ноль - хороший результат: строка закрывается без потери школьного запаса.
+    // Это особенно важно, когда школа отстает от комбинаций или в этой строке еще мало записей.
+    private int GetSchoolZeroBonus(int row)
+    {
+        var bonus = 28;
+        var schoolFill = CountBusyMainCells(0, 6);
+        var combinationFill = CountBusyMainCells(6, RowCount - 1);
+        var rowBusy = CountBusyMainCellsInRow(row);
+
+        if (schoolFill + 4 < combinationFill)
+            bonus += 26;
+        if (rowBusy <= 1)
+            bonus += 16;
+        if (IsSchoolPrizeRaceTarget(row))
+            bonus += 30;
+
+        return bonus;
+    }
+
     // Штраф за зачеркивание комбинации вместо записи очков.
     // Редкие, но маловероятные строки можно вычеркивать раньше; каре, тройку и последний игровой столбец бережем.
     private int GetComputerCrossOutPenalty(int row)
@@ -157,10 +178,10 @@ public partial class MainWindow
 
     private bool ShouldAllowNegativeSchool(int row, int score)
     {
-        if (row > 2 || score >= 0)
+        if (score >= 0)
             return false;
 
-        return CurrentPlayer.School > 0 && -score <= 3 && -score <= CurrentPlayer.School;
+        return CurrentPlayer.School > 0 && -score <= 6 && -score <= CurrentPlayer.School;
     }
 
     private bool ShouldPreferCombinationsOverSchool()

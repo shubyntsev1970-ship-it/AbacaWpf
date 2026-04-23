@@ -39,6 +39,7 @@
             <Menu DockPanel.Dock="Top" Background="#0B1117" Foreground="#F8FAFC" FontSize="28">
                 <MenuItem Header="_Game" Background="#0B1117" Foreground="#F8FAFC">
                     <MenuItem Header="_New game" Click="NewGame_Click" Foreground="#111827"/>
+                    <MenuItem x:Name="AiTrainingLogMenuItem" Header="_AI training log" Click="AiLogging_Click" IsCheckable="True" Foreground="#111827"/>
                     <Separator/>
                     <MenuItem Header="_Exit" Click="Exit_Click" Foreground="#111827"/>
                 </MenuItem>

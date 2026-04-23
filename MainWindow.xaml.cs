@@ -14,7 +14,7 @@ namespace AbacaWpf;
 
 public partial class MainWindow : Window
 {
-    private const string AppVersion = "0.9.6-test";
+    private const string AppVersion = "0.9.19-test";
     private const double TableLineThickness = 2.5;
 
     // Board geometry and table markers.
@@ -75,7 +75,7 @@ public partial class MainWindow : Window
     // Game setup: asks for players and resets all state before the first turn.
     private void StartNewGame()
     {
-        var dialog = new StartGameWindow(_random) { Owner = this };
+        var dialog = new StartGameWindow(_random, _aiTrainingLoggingEnabled) { Owner = this };
         if (dialog.ShowDialog() != true)
         {
             Close();
@@ -90,6 +90,9 @@ public partial class MainWindow : Window
             (_players[0], _players[1]) = (_players[1], _players[0]);
         }
 
+        SetAiTrainingLogging(dialog.AiTrainingLoggingEnabled);
+        AiTrainingLogMenuItem.IsChecked = _aiTrainingLoggingEnabled;
+        ResetAiTrainingGameLog();
         _currentPlayerIndex = 1;
         ClearTableValues();
         StartNextTurn();
@@ -425,13 +428,14 @@ public partial class MainWindow : Window
         }
 
         WriteTable(row, column, score);
+        if (fromComputer)
+        {
+            await Task.Delay(320);
+            await CaptureAiTrainingStepAsync("07_written_to_table", row, column, score);
+        }
+
         if (IsGameOver())
             return;
-
-        // Test pause for AI analysis: after the computer writes to the table,
-        // keep the final dice and highlighted cell visible for screenshots.
-        if (fromComputer)
-            await Task.Delay(3000);
 
         StartNextTurn();
     }
@@ -749,6 +753,12 @@ public partial class MainWindow : Window
     }
 
     private void NewGame_Click(object sender, RoutedEventArgs e) => StartNewGame();
+
+    private void AiLogging_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem item)
+            SetAiTrainingLogging(item.IsChecked);
+    }
 
     private void Exit_Click(object sender, RoutedEventArgs e) => Close();
 
@@ -1414,9 +1424,11 @@ public partial class MainWindow : Window
         _computerTurnInProgress = true;
         UpdateInputState();
         var scored = false;
+        BeginAiTrainingTurnLog();
 
         try
         {
+            await CaptureAiTrainingStepAsync("01_before_roll_1");
             await Task.Delay(750);
             while (CurrentPlayer.IsComputer && _rollCount < 3)
             {
@@ -1425,12 +1437,14 @@ public partial class MainWindow : Window
                     StopRolling();
                     UpdateScorePanel();
                     BuildDice();
+                    await CaptureAiTrainingStepAsync(GetAiTrainingAfterRollStepName());
                 }
 
                 await Task.Delay(450);
                 var best = GetBestComputerMove();
                 if (_rollCount >= 3 || ShouldComputerStop(best))
                 {
+                    SetAiTrainingDecision(best.Row, CalculateScore(best.Row), "stop");
                     _computerTurnInProgress = false;
                     ScoreCombination(best.Row, true);
                     scored = true;
@@ -1439,10 +1453,12 @@ public partial class MainWindow : Window
 
                 ApplyComputerKeepStrategy();
                 BuildDice();
+                await CaptureAiTrainingStepAsync(GetAiTrainingKeepStepName());
                 await Task.Delay(350);
 
                 if (_fixedDice.All(fixedDie => fixedDie))
                 {
+                    SetAiTrainingDecision(best.Row, CalculateScore(best.Row), "all_dice_fixed");
                     _computerTurnInProgress = false;
                     ScoreCombination(best.Row, true);
                     scored = true;
@@ -1459,7 +1475,11 @@ public partial class MainWindow : Window
             {
                 if (_isRolling)
                     StopRolling();
+                UpdateScorePanel();
+                BuildDice();
+                await CaptureAiTrainingStepAsync(GetAiTrainingAfterRollStepName());
                 var best = GetBestComputerMove();
+                SetAiTrainingDecision(best.Row, CalculateScore(best.Row), "fallback");
                 _computerTurnInProgress = false;
                 ScoreCombination(best.Row, true);
                 scored = true;
