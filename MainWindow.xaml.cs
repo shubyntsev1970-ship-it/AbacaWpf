@@ -14,7 +14,7 @@ namespace AbacaWpf;
 
 public partial class MainWindow : Window
 {
-    private const string AppVersion = "0.9.24-test";
+    private const string AppVersion = "0.9.27-test";
     private const double TableLineThickness = 2.5;
 
     // Board geometry and table markers.
@@ -51,6 +51,7 @@ public partial class MainWindow : Window
     private int _rollCount;
     private bool _isRolling;
     private bool _computerTurnInProgress;
+    private int _gameFlowVersion;
 
     // Window startup and initial control construction.
     public MainWindow()
@@ -75,6 +76,7 @@ public partial class MainWindow : Window
     // Game setup: asks for players and resets all state before the first turn.
     private void StartNewGame()
     {
+        CancelCurrentGameActivity();
         var dialog = new StartGameWindow(_random, _aiTrainingLoggingEnabled) { Owner = this };
         if (dialog.ShowDialog() != true)
         {
@@ -96,6 +98,20 @@ public partial class MainWindow : Window
         _currentPlayerIndex = 1;
         ClearTableValues();
         StartNextTurn();
+    }
+
+    private void CancelCurrentGameActivity()
+    {
+        _gameFlowVersion++;
+        _computerTurnInProgress = false;
+        _isRolling = false;
+        _rollTimer.Stop();
+        RollButton.Content = "СТАРТ";
+        Array.Fill(_fixedDice, false);
+        Array.Fill(_selectedDice, false);
+        BuildDice();
+        UpdateScorePanel();
+        UpdateInputState();
     }
 
     // Table construction and cell rendering.
@@ -660,7 +676,6 @@ public partial class MainWindow : Window
 
         UpdateScorePanel();
         ShowWinnerMessage(winner?.Name, message, scoreDifference);
-        Close();
         return true;
     }
 
@@ -1432,6 +1447,7 @@ public partial class MainWindow : Window
         if (_computerTurnInProgress)
             return;
 
+        var flowVersion = _gameFlowVersion;
         _computerTurnInProgress = true;
         UpdateInputState();
         var scored = false;
@@ -1440,18 +1456,28 @@ public partial class MainWindow : Window
         try
         {
             await CaptureAiTrainingStepAsync("01_before_roll_1");
+            if (flowVersion != _gameFlowVersion)
+                return;
             await Task.Delay(750);
+            if (flowVersion != _gameFlowVersion)
+                return;
             while (CurrentPlayer.IsComputer && _rollCount < 3)
             {
+                if (flowVersion != _gameFlowVersion)
+                    return;
                 if (_isRolling)
                 {
                     StopRolling();
                     UpdateScorePanel();
                     BuildDice();
                     await CaptureAiTrainingStepAsync(GetAiTrainingAfterRollStepName());
+                    if (flowVersion != _gameFlowVersion)
+                        return;
                 }
 
                 await Task.Delay(450);
+                if (flowVersion != _gameFlowVersion)
+                    return;
                 var best = GetBestComputerMove();
                 if (_rollCount >= 3 || ShouldComputerStop(best))
                 {
@@ -1465,7 +1491,11 @@ public partial class MainWindow : Window
                 ApplyComputerKeepStrategy();
                 BuildDice();
                 await CaptureAiTrainingStepAsync(GetAiTrainingKeepStepName());
+                if (flowVersion != _gameFlowVersion)
+                    return;
                 await Task.Delay(350);
+                if (flowVersion != _gameFlowVersion)
+                    return;
 
                 if (_fixedDice.All(fixedDie => fixedDie))
                 {
@@ -1480,6 +1510,8 @@ public partial class MainWindow : Window
                 UpdateScorePanel();
                 BuildDice();
                 await Task.Delay(750);
+                if (flowVersion != _gameFlowVersion)
+                    return;
             }
 
             if (!scored && CurrentPlayer.IsComputer)
@@ -1489,6 +1521,8 @@ public partial class MainWindow : Window
                 UpdateScorePanel();
                 BuildDice();
                 await CaptureAiTrainingStepAsync(GetAiTrainingAfterRollStepName());
+                if (flowVersion != _gameFlowVersion)
+                    return;
                 var best = GetBestComputerMove();
                 SetAiTrainingDecision(best.Row, CalculateScore(best.Row), "fallback");
                 _computerTurnInProgress = false;
