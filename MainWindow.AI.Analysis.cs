@@ -145,11 +145,11 @@ public partial class MainWindow
             13 => 0,  // абак: редкая комбинация, ее можно вычеркивать первой
             11 => 3,  // большой стрит
             10 => 4,  // малый стрит
-            9 => 10,  // фул
-            7 => 13,  // две пары
-            6 => 15,  // пара
-            12 => 28, // каре лучше беречь
-            8 => 30,  // тройку тоже не вычеркиваем рано
+            7 => 28,  // две пары
+            6 => 30,  // пара
+            8 => 34,  // тройку тоже не вычеркиваем рано
+            9 => 40,  // фул лучше беречь
+            12 => 46, // каре лучше беречь
             _ => 18
         };
 
@@ -168,7 +168,9 @@ public partial class MainWindow
 
     private bool HasSacrificialCrossOutAvailable()
     {
-        return IsRowOpenForCrossOut(13) || IsRowOpenForCrossOut(11) || IsRowOpenForCrossOut(10);
+        return IsRowOpenForCrossOut(13)
+            || IsRowOpenForCrossOut(11)
+            || IsRowOpenForCrossOut(10);
     }
 
     private bool IsRowOpenForCrossOut(int row)
@@ -181,7 +183,127 @@ public partial class MainWindow
         if (score >= 0)
             return false;
 
+        if (!IsLegalSchoolMove(row, score))
+            return false;
+
+        if (!IsNegativeSchoolRiskAcceptable(row, score))
+            return false;
+
+        if (CountDice(row + 1) > 0 && IsLastOpenSchoolCell(row))
+            return true;
+
+        if (CountDice(row + 1) > 0 && CanSafelyCloseRemainingSchool(row, score))
+            return true;
+
         return CurrentPlayer.School > 0 && -score <= 6 && -score <= CurrentPlayer.School;
+    }
+
+    private bool IsLegalSchoolMove(int row, int score)
+    {
+        if (row is < 0 or >= 6)
+            return false;
+
+        if (score >= 0)
+            return true;
+
+        if (CountDice(row + 1) == 0 && HasFreeCombinationMainCell())
+            return false;
+
+        if (-score > CurrentPlayer.School && !CurrentPlayer.IsOnlySchoolFree())
+            return false;
+
+        return true;
+    }
+
+    private bool IsLegalComputerMove(int row, int score)
+    {
+        if (row is < 0 or >= RowCount - 1 || CurrentPlayer.GetFreeCell(row) == -1)
+            return false;
+
+        if (row >= 6)
+            return true;
+
+        if (!IsLegalSchoolMove(row, score))
+            return false;
+
+        return score >= 0 || !HasFreeCombinationMainCell() || ShouldAllowNegativeSchool(row, score);
+    }
+
+    private bool IsNegativeSchoolRiskAcceptable(int row, int score)
+    {
+        if (row is < 0 or >= 6 || score >= 0)
+            return false;
+
+        var remainingSchool = CurrentPlayer.School + score;
+        if (remainingSchool < 0)
+            return false;
+
+        var highDemand = Enumerable.Range(1, 6)
+            .Where(value => value >= 5 && value - 1 != row && CurrentPlayer.GetFreeCell(value - 1) != -1)
+            .Sum(value => (ColumnCount - 1 - CountBusyMainCellsInRow(value - 1)) * value);
+        if (highDemand > 0 && remainingSchool < highDemand)
+            return false;
+
+        var maxRemainingRowCost = Enumerable.Range(0, 6)
+            .Where(schoolRow => schoolRow != row && CurrentPlayer.GetFreeCell(schoolRow) != -1)
+            .Select(GetMinimumSchoolCloseCost)
+            .DefaultIfEmpty(0)
+            .Max();
+
+        return remainingSchool >= maxRemainingRowCost;
+    }
+
+    private bool IsLastOpenSchoolCell(int row)
+    {
+        if (row is < 0 or >= 6 || CurrentPlayer.GetFreeCell(row) == -1)
+            return false;
+
+        var freeSchoolCells = 0;
+        for (var schoolRow = 0; schoolRow < 6; schoolRow++)
+        {
+            for (var column = 0; column < ColumnCount - 1; column++)
+            {
+                if (CurrentPlayer.Table[schoolRow, column] == EmptyCell)
+                    freeSchoolCells++;
+            }
+        }
+
+        return freeSchoolCells == 1;
+    }
+
+    private bool CanSafelyCloseRemainingSchool(int targetRow, int targetScore)
+    {
+        if (targetRow is < 0 or >= 6 || targetScore >= 0)
+            return false;
+
+        var remainingDemand = 0;
+        for (var row = 0; row < 6; row++)
+        {
+            if (CurrentPlayer.GetFreeCell(row) == -1)
+                continue;
+
+            if (row == targetRow)
+                continue;
+
+            remainingDemand += GetMinimumSchoolCloseCost(row);
+        }
+
+        return CurrentPlayer.School + targetScore >= remainingDemand;
+    }
+
+    private int GetMinimumSchoolCloseCost(int row)
+    {
+        if (row is < 0 or >= 6 || CurrentPlayer.GetFreeCell(row) == -1)
+            return 0;
+
+        var freeCells = 0;
+        for (var column = 0; column < ColumnCount - 1; column++)
+        {
+            if (CurrentPlayer.Table[row, column] == EmptyCell)
+                freeCells++;
+        }
+
+        return freeCells * (row + 1);
     }
 
     private bool ShouldPreferCombinationsOverSchool()

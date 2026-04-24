@@ -3,7 +3,7 @@
   <Package
     Name="Abaca"
     Manufacturer="Abaca"
-    Version="0.9.19"
+    Version="0.9.24"
     UpgradeCode="1BA72D33-5B1D-4CDE-9D6A-09780EAB17E1"
     Scope="perUser">
 

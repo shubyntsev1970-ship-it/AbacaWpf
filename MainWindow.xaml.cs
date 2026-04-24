@@ -14,7 +14,7 @@ namespace AbacaWpf;
 
 public partial class MainWindow : Window
 {
-    private const string AppVersion = "0.9.19-test";
+    private const string AppVersion = "0.9.24-test";
     private const double TableLineThickness = 2.5;
 
     // Board geometry and table markers.
@@ -409,6 +409,17 @@ public partial class MainWindow : Window
             return;
 
         var score = CalculateScore(row);
+        if (fromComputer && !IsLegalComputerMove(row, score))
+        {
+            var fallbackRow = GetBestLegalComputerFallbackRow(row);
+            if (fallbackRow >= 0)
+            {
+                ScoreCombination(fallbackRow, true);
+                return;
+            }
+
+            return;
+        }
         if (row < 6 && score < 0 && CountDice(row + 1) == 0 && HasFreeCombinationMainCell())
         {
             ShowLargeMessage("ABACA", "В школе нельзя вычеркивать строку без нужной кости, пока есть свободные клетки в комбинациях.");
@@ -798,7 +809,7 @@ public partial class MainWindow : Window
 
     private void About_Click(object sender, RoutedEventArgs e)
     {
-        ShowLargeMessage("About", "Abaca\nНовая WPF-версия старой WinForms-игры с обновленной графикой и встроенной справкой.", 24);
+        ShowLargeMessage("О программе", "Abaca - это настольная игра в кости, где нужно собирать выгодные комбинации и грамотно заполнять таблицу.\n\nПобеждает тот, кто лучше балансирует школу, комбинации и призы по строкам и столбцам. Играйте против другого игрока или компьютера и выбирайте самый сильный ход в каждой раздаче.", 24);
     }
 
     private void ShowLargeMessage(string title, string message, double fontSize = 24)
@@ -1491,6 +1502,21 @@ public partial class MainWindow : Window
                 _computerTurnInProgress = false;
             UpdateInputState();
         }
+    }
+
+    private int GetBestLegalComputerFallbackRow(int excludedRow)
+    {
+        for (var row = 0; row < RowCount - 1; row++)
+        {
+            if (row == excludedRow || CurrentPlayer.GetFreeCell(row) == -1)
+                continue;
+
+            var score = CalculateScore(row);
+            if (IsLegalComputerMove(row, score))
+                return row;
+        }
+
+        return -1;
     }
 
     // Player state and helpers for occupied rows/columns.

@@ -37,15 +37,15 @@
     <Grid>
         <DockPanel>
             <Menu DockPanel.Dock="Top" Background="#0B1117" Foreground="#F8FAFC" FontSize="28">
-                <MenuItem Header="_Game" Background="#0B1117" Foreground="#F8FAFC">
-                    <MenuItem Header="_New game" Click="NewGame_Click" Foreground="#111827"/>
+                <MenuItem Header="_Игра" Background="#0B1117" Foreground="#F8FAFC">
+                    <MenuItem Header="_Новая игра" Click="NewGame_Click" Foreground="#111827"/>
                     <MenuItem x:Name="AiTrainingLogMenuItem" Header="_AI training log" Click="AiLogging_Click" IsCheckable="True" Foreground="#111827"/>
                     <Separator/>
-                    <MenuItem Header="_Exit" Click="Exit_Click" Foreground="#111827"/>
+                    <MenuItem Header="_Выход" Click="Exit_Click" Foreground="#111827"/>
                 </MenuItem>
-                <MenuItem Header="_Help" Background="#0B1117" Foreground="#F8FAFC">
-                    <MenuItem Header="_Rules" Click="Rules_Click" Foreground="#111827"/>
-                    <MenuItem Header="_About" Click="About_Click" Foreground="#111827"/>
+                <MenuItem Header="_Справка" Background="#0B1117" Foreground="#F8FAFC">
+                    <MenuItem Header="_Правила" Click="Rules_Click" Foreground="#111827"/>
+                    <MenuItem Header="_О программе" Click="About_Click" Foreground="#111827"/>
                 </MenuItem>
             </Menu>
 
@@ -131,7 +131,7 @@
                     </ItemsControl>
                     <StackPanel Grid.Column="2" Margin="18,0,0,0" Width="160">
                         <Button x:Name="RollButton" Content="СТАРТ" Height="44" FontSize="17" FontWeight="Bold" Click="RollButton_Click"/>
-                        <TextBlock Text="Клик по кубику фиксирует его. Space - старт/стоп." Foreground="#BBD0DD" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                        <TextBlock Text="Клик по кубику фиксирует/расфиксирует его. Space - старт/стоп." Foreground="#BBD0DD" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8,0,0"/>
                     </StackPanel>
                 </Grid>
             </Border>
