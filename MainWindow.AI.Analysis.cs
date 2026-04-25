@@ -188,6 +188,8 @@ public partial class MainWindow
 
         if (score == -1)
             return true;
+        if (score >= -3)
+            return true;
 
         if (!IsNegativeSchoolRiskAcceptable(row, score))
             return false;
@@ -253,7 +255,23 @@ public partial class MainWindow
             .DefaultIfEmpty(0)
             .Max();
 
+        if (ShouldProtectExistingLeadWithSchool() && remainingSchool < maxRemainingRowCost + 2)
+            return false;
+
         return remainingSchool >= maxRemainingRowCost;
+    }
+
+    private bool ShouldProtectExistingLeadWithSchool()
+    {
+        var opponent = _players[1 - _currentPlayerIndex];
+        var lead = CurrentPlayer.Score - opponent.Score;
+        if (lead <= 0)
+            return false;
+
+        if (HasHeavySchoolEndgamePressure())
+            return lead >= 60;
+
+        return CountFreeMainCells() <= 10 && lead >= 120;
     }
 
     private bool IsLastOpenSchoolCell(int row)

@@ -918,7 +918,7 @@ public partial class MainWindow
         if (score >= -2)
             return false;
 
-        var sacrificialRow = GetSacrificialCrossOutRow();
+        var sacrificialRow = GetPreferredSchoolSafetyCrossOutRow(schoolRow);
         if (sacrificialRow < 0 || ShouldProtectOwnPrizeProgressBeforeCrossOut(sacrificialRow))
             return false;
 
@@ -1150,7 +1150,9 @@ public partial class MainWindow
         if (affordableSchoolRow >= 0 && !ShouldPreferSacrificialCrossOutOverSchool(affordableSchoolRow))
             return -1;
 
-        var sacrificialRow = GetSacrificialCrossOutRow();
+        var sacrificialRow = affordableSchoolRow >= 0
+            ? GetPreferredSchoolSafetyCrossOutRow(affordableSchoolRow)
+            : GetSacrificialCrossOutRow();
         if (sacrificialRow < 0)
             return -1;
 
@@ -1238,6 +1240,31 @@ public partial class MainWindow
             .OrderByDescending(item => item.Priority)
             .Select(item => item.Row)
             .FirstOrDefault(-1);
+    }
+
+    private int GetPreferredSchoolSafetyCrossOutRow(int schoolRow)
+    {
+        var score = CalculateScore(schoolRow);
+        var remainingSchool = CurrentPlayer.School + score;
+        if (score > -4 || remainingSchool > 8)
+            return GetSacrificialCrossOutRow();
+
+        var saferStraightRow = new[] { 10, 11 }
+            .Where(IsRowOpenForCrossOut)
+            .Where(row => !ShouldProtectOwnPrizeProgressBeforeCrossOut(row))
+            .Select(row => new
+            {
+                Row = row,
+                Column = CurrentPlayer.GetFreeCell(row),
+                Priority = GetSacrificialOrderBonus(row)
+                    + CountCrossesInMainColumn(CurrentPlayer.GetFreeCell(row)) * 24
+                    - CountBusyMainCellsInRow(row) * 20
+            })
+            .OrderByDescending(item => item.Priority)
+            .Select(item => item.Row)
+            .FirstOrDefault(-1);
+
+        return saferStraightRow >= 0 ? saferStraightRow : GetSacrificialCrossOutRow();
     }
 
     private int GetEmergencySacrificialCrossOutRow()
@@ -1910,7 +1937,7 @@ public partial class MainWindow
     {
         var opponent = _players[1 - _currentPlayerIndex];
         var lead = CurrentPlayer.Score - opponent.Score;
-        if (lead < 180)
+        if (lead < 100)
             return false;
 
         return CountFreeMainCells() <= 16 || HasHeavySchoolEndgamePressure();
@@ -2169,16 +2196,17 @@ public partial class MainWindow
     {
         if (_rollCount >= 3 || CurrentPlayer.GetFreeCell(9) == -1)
             return false;
-        if (CountFreeMainCells() > 14)
+        var lateRarePlanOnly = HasLateRareCombinationPlanForFullHouse();
+        if (!lateRarePlanOnly && CountFreeMainCells() > 14)
             return false;
         var fullRowFill = CountBusyMainCellsInRow(9);
-        if (fullRowFill > 2)
+        if (!lateRarePlanOnly && fullRowFill > 2)
             return false;
         if (HasHeavySchoolEndgamePressure())
             return false;
         if (GetComputerSchoolTarget(counts) >= 5)
             return false;
-        if (fullRowFill >= 2 && !IsTacticalPrizeMove(9))
+        if (!lateRarePlanOnly && fullRowFill >= 2 && !IsTacticalPrizeMove(9))
             return false;
 
         var pairValues = counts
@@ -2193,6 +2221,17 @@ public partial class MainWindow
 
         KeepValues(pairValues.ToHashSet());
         return true;
+    }
+
+    private bool HasLateRareCombinationPlanForFullHouse()
+    {
+        var openCombinationRows = Enumerable.Range(6, RowCount - 7)
+            .Where(row => CurrentPlayer.GetFreeCell(row) != -1)
+            .ToArray();
+        if (openCombinationRows.Length == 0)
+            return false;
+
+        return openCombinationRows.All(row => row is 9 or 10 or 11 or 13);
     }
 
     private bool TryKeepOpenOnesForSchool((int Value, int Count)[] counts)
