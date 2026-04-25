@@ -131,7 +131,7 @@
                     </ItemsControl>
                     <StackPanel Grid.Column="2" Margin="18,0,0,0" Width="160">
                         <Button x:Name="RollButton" Content="СТАРТ" Height="44" FontSize="17" FontWeight="Bold" Click="RollButton_Click"/>
-                        <TextBlock Text="Клик по кубику фиксирует/расфиксирует его. Space - старт/стоп." Foreground="#BBD0DD" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                        <TextBlock Text="Клик по кубику фиксирует/расфиксирует его. Space - старт/стоп. Комбинацию можно выбрать внизу или кликом по названию в таблице." Foreground="#BBD0DD" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8,0,0"/>
                     </StackPanel>
                 </Grid>
             </Border>

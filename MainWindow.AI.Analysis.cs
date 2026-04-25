@@ -186,6 +186,9 @@ public partial class MainWindow
         if (!IsLegalSchoolMove(row, score))
             return false;
 
+        if (score == -1)
+            return true;
+
         if (!IsNegativeSchoolRiskAcceptable(row, score))
             return false;
 

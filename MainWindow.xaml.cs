@@ -14,7 +14,7 @@ namespace AbacaWpf;
 
 public partial class MainWindow : Window
 {
-    private const string AppVersion = "0.9.27-test";
+    private const string AppVersion = "0.9.31-test";
     private const double TableLineThickness = 2.5;
 
     // Board geometry and table markers.
@@ -149,7 +149,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private static void AddHeaderCell(Grid grid, string text, int row, int column)
+    private void AddHeaderCell(Grid grid, string text, int row, int column)
     {
         var border = new Border
         {
@@ -158,8 +158,26 @@ public partial class MainWindow : Window
             Background = row == 0 || column == 0 ? new SolidColorBrush(Color.FromRgb(33, 78, 114)) : Brushes.Transparent
         };
         var fontSize = column == 0 && row > 0 ? 22 : text.Length > 7 ? 12 : text.Length > 4 ? 14 : 16;
-        var label = CreateCaptionTextBlock(text, fontSize);
-        border.Child = label;
+        if (column == 0 && row > 0 && row < RowCount)
+        {
+            var button = new Button
+            {
+                Content = CreateCaptionTextBlock(text, fontSize),
+                Tag = row - 1,
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(0),
+                Cursor = Cursors.Hand,
+                ToolTip = GetCombinationHelp(row - 1)
+            };
+            button.Click += CombinationButton_Click;
+            border.Child = button;
+        }
+        else
+        {
+            var label = CreateCaptionTextBlock(text, fontSize);
+            border.Child = label;
+        }
         Grid.SetRow(border, row);
         Grid.SetColumn(border, column);
         grid.Children.Add(border);
@@ -818,7 +836,8 @@ public partial class MainWindow : Window
             "  S - большой стрит\n" +
             "  C - каре\n" +
             "  A - абак\n" +
-            "  + - сумма";
+            "  + - сумма\n\n" +
+            "Мышь: комбинацию можно выбрать не только в нижней строке, но и кликом по названию строки в таблице.";
         ShowLargeMessage("Help - Rules", rules, 22);
     }
 
