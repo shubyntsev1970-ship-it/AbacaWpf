@@ -225,6 +225,12 @@ public partial class MainWindow
         if (CurrentPlayer.GetFreeCell(13) != -1 && counts.Any(pair => pair.Value == 5))
             return 13;
 
+        if (_rollCount == 1
+            && CurrentPlayer.GetFreeCell(14) != -1
+            && CalculateScore(14) > 0
+            && IsTacticalPrizeMove(14))
+            return 14;
+
         var forcedOpeningMajorRow = GetForcedOpeningReadyMajorMove(counts);
         if (forcedOpeningMajorRow >= 0)
             return forcedOpeningMajorRow;
@@ -427,6 +433,8 @@ public partial class MainWindow
             : 0;
         if (ownRowBusy >= ColumnCount - 2 || ownColumnBusy >= RowCount - 2)
             return false;
+        if (GetOwnPrizeDistanceForWeakBlock(row) > 1 && GetTacticalPrizeUrgency(row) < 180)
+            return true;
         if (GetTacticalPrizeUrgency(row) < 140 && HasStrongReadyAlternativeForWeakBlock(counts))
             return true;
 
@@ -434,6 +442,19 @@ public partial class MainWindow
             || CurrentPlayer.GetFreeCell(9) != -1 && IsFullHouseWorthRecording(counts)
             || row is 6 or 7 && CurrentPlayer.GetFreeCell(8) != -1 && counts.Any(pair => pair.Value >= 3)
             || counts.Any(pair => pair.Value >= 3 && CurrentPlayer.GetFreeCell(pair.Key - 1) != -1);
+    }
+
+    private int GetOwnPrizeDistanceForWeakBlock(int row)
+    {
+        var rowBusy = CountBusyMainCellsInRow(row);
+        var rowDistance = Math.Max(0, (ColumnCount - 1) - rowBusy);
+
+        var column = CurrentPlayer.GetFreeCell(row);
+        var columnDistance = column >= 0 && column < ColumnCount - 1
+            ? Math.Max(0, (RowCount - 1) - CountBusyMainCellsInColumn(column))
+            : int.MaxValue;
+
+        return Math.Min(rowDistance, columnDistance);
     }
 
     private bool HasStrongReadyAlternativeForWeakBlock(Dictionary<int, int> counts)
@@ -813,14 +834,22 @@ public partial class MainWindow
 
     private bool ShouldPreferEndgameSchoolSecurity(int row)
     {
-        if (row is < 0 or >= 6 || _rollCount < 3 || CountFreeMainCells() > 8)
+        if (row is < 0 or >= 6 || _rollCount < 3)
             return false;
         if (CurrentPlayer.GetFreeCell(row) == -1 || CountDice(row + 1) < 3)
+            return false;
+
+        var isTenseSchoolEndgame = CountFreeMainCells() <= 8
+            || HasHeavySchoolEndgamePressure()
+            || HasComfortableLeadForSchoolLock();
+        if (!isTenseSchoolEndgame)
             return false;
 
         var value = row + 1;
         return value >= 5 && CurrentPlayer.School < value * 2
             || value >= 4 && CountDice(value) >= 4 && HasHeavySchoolEndgamePressure()
+            || value >= 5 && CountDice(value) >= 3 && HasHeavySchoolEndgamePressure() && CalculateScore(7) <= 16 && !IsTacticalPrizeMove(7)
+            || value >= 2 && CountDice(value) >= 4 && CurrentPlayer.School <= 4 && CalculateScore(7) <= 12 && !IsTacticalPrizeMove(7)
             || HasComfortableLeadForSchoolLock() && HasHeavySchoolEndgamePressure();
     }
 
@@ -852,6 +881,8 @@ public partial class MainWindow
 
         if (ShouldForceCheapSchoolOverCrossOut(affordableSchoolRow))
             return affordableSchoolRow;
+        if (ShouldPreferSchoolCrossOutInsteadOfSelfDamagingSchool(affordableSchoolRow))
+            return -1;
         if (ShouldPreferSacrificialCrossOutOverSchool(affordableSchoolRow))
             return -1;
 
@@ -944,6 +975,25 @@ public partial class MainWindow
         return !IsTacticalPrizeMove(schoolRow)
             && !CompletesOwnRowPrize(schoolRow)
             && !ShouldBlockOpponentRowPrize(schoolRow);
+    }
+
+    private bool ShouldPreferSchoolCrossOutInsteadOfSelfDamagingSchool(int schoolRow)
+    {
+        if (schoolRow is < 0 or >= 6 || CurrentPlayer.GetFreeCell(schoolRow) == -1)
+            return false;
+
+        var score = CalculateScore(schoolRow);
+        if (score > -3)
+            return false;
+        if (ShouldBlockOpponentRowPrize(schoolRow))
+            return false;
+        if (GetSchoolNegativeSelfDamage(schoolRow) < 40)
+            return false;
+        if (!HasSacrificialCrossOutAvailable())
+            return false;
+
+        var sacrificialRow = GetPreferredSchoolSafetyCrossOutRow(schoolRow);
+        return sacrificialRow >= 0 && !ShouldProtectOwnPrizeProgressBeforeCrossOut(sacrificialRow);
     }
 
     private bool ShouldProtectOwnPrizeProgressBeforeCrossOut(int row)
@@ -1101,6 +1151,7 @@ public partial class MainWindow
     private bool ShouldTakeOpeningPair()
     {
         return _rollCount == 1
+            && (!HasStraightFork() || GetTacticalPrizeUrgency(6) >= 140)
             && CountBusyMainCellsInRow(6) == 0
             && !GetDiceCounts().Any(pair => pair.Value >= 3)
             && !GetDiceCounts().Any(pair => pair.Key >= 3 && pair.Value >= 2 && CurrentPlayer.GetFreeCell(pair.Key - 1) != -1)
@@ -1111,6 +1162,15 @@ public partial class MainWindow
     private int GetForcedTripleMove()
     {
         if (CurrentPlayer.GetFreeCell(8) == -1 || !GetDiceCounts().Any(pair => pair.Value >= 3))
+            return -1;
+
+        var tripleScore = CalculateScore(8);
+        var affordableSchoolRow = GetAffordableNegativeSchoolRow();
+        if (affordableSchoolRow >= 0
+            && !IsTacticalPrizeMove(8)
+            && tripleScore <= 12
+            && CalculateScore(affordableSchoolRow) >= -2
+            && (HasHeavySchoolEndgamePressure() || HasComfortableLeadForSchoolLock()))
             return -1;
 
         var hasStrongerSameDiceMove =
@@ -1652,6 +1712,9 @@ public partial class MainWindow
         if (TryKeepCriticalEndgameSchoolDice(counts))
             return;
 
+        if (TryKeepNothingWhenSchoolFragileAndNoLiveSchoolDice(counts))
+            return;
+
         if (TryKeepEndgameTargetDice())
             return;
 
@@ -1862,13 +1925,13 @@ public partial class MainWindow
     {
         if (_rollCount >= 3)
             return false;
-        if (CountFreeMainCells() > 8 && !HasHeavySchoolEndgamePressure())
+        if (CountFreeMainCells() > 8 && !HasFragileSchoolEndgame())
             return false;
 
         var target = counts
             .Where(item => item.Count > 0
                 && CurrentPlayer.GetFreeCell(item.Value - 1) != -1
-                && (CurrentPlayer.School < item.Value || HasHeavySchoolEndgamePressure()))
+                && (CurrentPlayer.School < item.Value || HasFragileSchoolEndgame()))
             .OrderByDescending(item => GetCriticalSchoolKeepPriority(item.Value, item.Count))
             .ThenByDescending(item => item.Value)
             .FirstOrDefault();
@@ -1878,6 +1941,22 @@ public partial class MainWindow
             return false;
 
         KeepValues([target.Value]);
+        return true;
+    }
+
+    private bool TryKeepNothingWhenSchoolFragileAndNoLiveSchoolDice((int Value, int Count)[] counts)
+    {
+        if (_rollCount >= 3 || HasStraightFork())
+            return false;
+        if (!HasFragileSchoolEndgame())
+            return false;
+        if (GetUrgentComputerTargetRow() >= 0)
+            return false;
+        if (counts.Any(item => item.Count > 0 && CurrentPlayer.GetFreeCell(item.Value - 1) != -1))
+            return false;
+
+        for (var i = 0; i < DiceCount; i++)
+            _fixedDice[i] = false;
         return true;
     }
 
@@ -1931,6 +2010,22 @@ public partial class MainWindow
         return highSchoolDemand >= CurrentPlayer.School + 6
             || criticalSchoolDemand >= CurrentPlayer.School + 10
             || remainingSchoolDemand >= CurrentPlayer.School + 18;
+    }
+
+    private bool HasFragileSchoolEndgame()
+    {
+        if (HasHeavySchoolEndgamePressure())
+            return true;
+
+        var freeMainCells = CountFreeMainCells();
+        if (freeMainCells > 8)
+            return false;
+
+        var remainingSchoolDemand = Enumerable.Range(1, 6)
+            .Where(value => CurrentPlayer.GetFreeCell(value - 1) != -1)
+            .Sum(value => (ColumnCount - 1 - CountBusyMainCellsInRow(value - 1)) * value);
+
+        return remainingSchoolDemand >= CurrentPlayer.School + 2;
     }
 
     private bool HasComfortableLeadForSchoolLock()
@@ -2145,6 +2240,13 @@ public partial class MainWindow
             if (lockedPair.Count >= 2)
             {
                 if (pair.Count >= 2
+                    && lockedPair.Value != pair.Value
+                    && CurrentPlayer.GetFreeCell(lockedPair.Value - 1) != -1
+                    && CurrentPlayer.GetFreeCell(pair.Value - 1) == -1
+                    && !ShouldOverrideLockedOpenSchoolPair(lockedPair.Value, pair.Value))
+                    pair = lockedPair;
+
+                if (pair.Count >= 2
                     && CurrentPlayer.GetFreeCell(lockedPair.Value - 1) != -1
                     && CurrentPlayer.GetFreeCell(pair.Value - 1) == -1
                     && !IsTacticalPrizeMove(8)
@@ -2165,9 +2267,44 @@ public partial class MainWindow
         return true;
     }
 
+    private bool ShouldOverrideLockedOpenSchoolPair(int lockedValue, int candidateValue)
+    {
+        var candidateSchoolRow = candidateValue - 1;
+        if (candidateSchoolRow >= 0
+            && candidateSchoolRow < 6
+            && CurrentPlayer.GetFreeCell(candidateSchoolRow) != -1)
+            return true;
+
+        var kareFreeCell = CurrentPlayer.GetFreeCell(12);
+        if (kareFreeCell != -1
+            && CountDice(candidateValue) >= 4
+            && (CompletesOwnRowPrize(12)
+                || kareFreeCell < ColumnCount - 1 && CompletesOwnColumnPrize(kareFreeCell)
+                || IsTacticalPrizeMove(12)))
+            return true;
+
+        var tripleFreeCell = CurrentPlayer.GetFreeCell(8);
+        if (tripleFreeCell != -1
+            && CountDice(candidateValue) >= 3
+            && (CompletesOwnRowPrize(8)
+                || tripleFreeCell < ColumnCount - 1 && CompletesOwnColumnPrize(tripleFreeCell)
+                || IsTacticalPrizeMove(8)))
+            return true;
+
+        var twoPairsFreeCell = CurrentPlayer.GetFreeCell(7);
+        if (twoPairsFreeCell != -1
+            && CalculateScore(7) > 0
+            && (CompletesOwnRowPrize(7)
+                || twoPairsFreeCell < ColumnCount - 1 && CompletesOwnColumnPrize(twoPairsFreeCell)
+                || IsTacticalPrizeMove(7)))
+            return true;
+
+        return false;
+    }
+
     private bool TryKeepCriticalSchoolSingleOverDeadPair((int Value, int Count)[] counts)
     {
-        if (_rollCount >= 3 || !HasHeavySchoolEndgamePressure())
+        if (_rollCount >= 3 || !HasFragileSchoolEndgame())
             return false;
 
         var pair = counts
@@ -2406,7 +2543,7 @@ public partial class MainWindow
     {
         if (pairValue < 2 || pairCount < 2 || schoolSingle.Count == 0)
             return false;
-        if (!HasHeavySchoolEndgamePressure() && CountFreeMainCells() > 10)
+        if (!HasFragileSchoolEndgame() && CountFreeMainCells() > 10)
             return false;
 
         var pairRow = pairValue - 1;
@@ -2520,6 +2657,15 @@ public partial class MainWindow
             && CountDice(row + 1) < 3
             && !ownPrizeNow
             && !blocksOpponentColumnNow)
+            return false;
+
+        if (schoolValue >= 5
+            && HasHeavySchoolEndgamePressure()
+            && row < 6
+            && row != schoolValue - 1
+            && !ownPrizeNow
+            && !blocksOpponentColumnNow
+            && !ShouldBlockOpponentRowPrize(row))
             return false;
 
         return CompletesOwnRowPrize(row)

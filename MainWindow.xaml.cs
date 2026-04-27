@@ -14,7 +14,7 @@ namespace AbacaWpf;
 
 public partial class MainWindow : Window
 {
-    private const string AppVersion = "0.9.32-test";
+    private const string AppVersion = "0.9.36-test";
     private const double TableLineThickness = 2.5;
 
     // Board geometry and table markers.
@@ -25,7 +25,6 @@ public partial class MainWindow : Window
     private const int EmptyCell = -100;
     private const double DiceSize = 100;
     private const double DiceHorizontalGap = DiceSize / 2;
-    private const double DiceOutlinePadding = 7;
 
     // Runtime game state and UI cell references.
     private readonly Random _random = new();
@@ -259,24 +258,21 @@ public partial class MainWindow : Window
             transform.Children.Add(new ScaleTransform(1, 1));
             transform.Children.Add(new RotateTransform(0));
 
-            var outlineThickness = _fixedDice[index]
-                ? _selectedDice[index] ? 6 : 3
-                : _selectedDice[index] ? 5 : 0;
-
-            var outerBorder = new Border
+            var border = new Border
             {
-                Width = DiceSize + DiceOutlinePadding * 2,
-                Height = DiceSize + DiceOutlinePadding * 2,
+                Width = DiceSize,
+                Height = DiceSize,
                 Margin = new Thickness(DiceHorizontalGap / 2, _fixedDice[index] ? 0 : DiceSize, DiceHorizontalGap / 2, _fixedDice[index] ? DiceSize : 0),
-                CornerRadius = new CornerRadius(14),
-                Padding = new Thickness(DiceOutlinePadding),
-                Background = Brushes.Transparent,
-                BorderThickness = new Thickness(outlineThickness),
+                CornerRadius = new CornerRadius(8),
+                BorderThickness = new Thickness(_fixedDice[index] ? _selectedDice[index] ? 6 : 0.625 : _selectedDice[index] ? 9 : 2),
                 BorderBrush = _fixedDice[index]
                     ? new SolidColorBrush(Color.FromRgb(239, 68, 68))
                     : _selectedDice[index]
                         ? new SolidColorBrush(Color.FromRgb(34, 197, 94))
-                        : Brushes.Transparent,
+                        : new SolidColorBrush(Color.FromRgb(187, 208, 221)),
+                Background = _fixedDice[index]
+                    ? new LinearGradientBrush(Color.FromRgb(255, 99, 99), Color.FromRgb(185, 28, 28), 45)
+                    : new LinearGradientBrush(Color.FromRgb(255, 255, 255), Color.FromRgb(219, 229, 237), 45),
                 Effect = new System.Windows.Media.Effects.DropShadowEffect
                 {
                     BlurRadius = 16,
@@ -285,20 +281,12 @@ public partial class MainWindow : Window
                 },
                 RenderTransform = transform,
                 RenderTransformOrigin = new Point(0.5, 0.5),
-                Child = new Border
-                {
-                    Width = DiceSize,
-                    Height = DiceSize,
-                    CornerRadius = new CornerRadius(10),
-                    Background = new SolidColorBrush(Color.FromRgb(16, 23, 32)),
-                    ClipToBounds = true,
-                    Child = CreateDiceFace(_dice[index])
-                }
+                Child = CreateDiceFace(_dice[index])
             };
             if (_isRolling && !_fixedDice[index])
-                AnimateRollingDie(outerBorder);
-            outerBorder.MouseLeftButtonDown += (_, _) => ToggleDie(index);
-            DiceItems.Items.Add(outerBorder);
+                AnimateRollingDie(border);
+            border.MouseLeftButtonDown += (_, _) => ToggleDie(index);
+            DiceItems.Items.Add(border);
         }
     }
 
@@ -341,8 +329,8 @@ public partial class MainWindow : Window
         return new Image
         {
             Source = new BitmapImage(new Uri($"pack://application:,,,/Assets/Dice_{value}.jpg", UriKind.Absolute)),
-            Stretch = Stretch.UniformToFill,
-            Margin = new Thickness(-7),
+            Stretch = Stretch.Uniform,
+            Margin = new Thickness(8),
             SnapsToDevicePixels = true
         };
     }
@@ -992,6 +980,7 @@ public partial class MainWindow : Window
 
     private void ShowWinnerMessage(string? winnerName, string message, int scoreDifference)
     {
+        _ = message;
         var titleText = winnerName is null ? "Ничья!" : "Победитель";
         var nameText = winnerName ?? "Победила дружба";
         var detailsText = winnerName is null
@@ -1051,17 +1040,6 @@ public partial class MainWindow : Window
             Margin = new Thickness(24, 0, 24, 14)
         };
 
-        var messageBlock = new TextBlock
-        {
-            Text = message,
-            FontSize = 20,
-            Foreground = new SolidColorBrush(Color.FromRgb(232, 240, 247)),
-            HorizontalAlignment = HorizontalAlignment.Center,
-            TextAlignment = TextAlignment.Center,
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(28, 0, 28, 18)
-        };
-
         var okButton = new Button
         {
             Content = "OK",
@@ -1081,7 +1059,6 @@ public partial class MainWindow : Window
                 titleBlock,
                 winnerBlock,
                 detailBlock,
-                messageBlock,
                 okButton
             }
         };
