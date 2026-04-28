@@ -111,8 +111,6 @@ public partial class MainWindow
         {
             ComputerDifficulty.Careful when row < 6 && score >= 0 => 12,
             ComputerDifficulty.Careful when row == 14 => 4,
-            ComputerDifficulty.Aggressive when row is >= 10 and <= 13 => 12,
-            ComputerDifficulty.Aggressive when row >= 6 && score > 0 => 5,
             _ => 0
         };
     }
@@ -269,9 +267,9 @@ public partial class MainWindow
             return false;
 
         if (HasHeavySchoolEndgamePressure())
-            return lead >= 60;
+            return lead >= 100;
 
-        return CountFreeMainCells() <= 10 && lead >= 120;
+        return CountFreeMainCells() <= 10 && lead >= 100;
     }
 
     private bool IsLastOpenSchoolCell(int row)
